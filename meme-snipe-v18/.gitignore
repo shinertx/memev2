@@ -1,0 +1,23 @@
+# Rust
+/target
+.rustc_info.json
+Cargo.lock
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Local Environment & Secrets
+.env
+my_wallet.json
+jito_auth_key.json
+
+# General
+.DS_Store
+/shared

@@ -208,19 +208,21 @@ graph TD
 
 ---
 
-## 🔧 **Operational Guide**
+## 🔧 **Operational Guide (GCP-Only Deployment)**
 
-### **1. Initial Repository Setup (Local Machine)**
+### **1. Initial Repository Setup (Local Machine - Preparation Only)**
+
+**⚠️ IMPORTANT:** This system is designed for **GCP deployment only**. Local setup is only for preparation and configuration.
 
 1.  **Clone the Repository:**
     ```bash
     git clone <your-repo-url>
-    cd meme-snipe-v18 # Or whatever your cloned directory is named
+    cd meme-snipe-v18
     ```
 
 2.  **Create Your Environment File:**
     ```bash
-    cp .env.example .env
+    cp env.example .env
     ```
 
 3.  **Prepare Your Wallet Keypair Files:**
@@ -233,79 +235,67 @@ graph TD
         solana-keygen new --outfile jito_auth_key.json
         ```
 
-4.  **Configure `.env` for Paper Trading:**
-    Open the `.env` file and fill in all placeholders. For initial paper trading, the `SOLANA_RPC_URL` and `JITO_RPC_URL` can point to devnet or mainnet public endpoints, but **API keys for data consumers are crucial even for paper trading with live data.**
+4.  **Configure `.env` for GCP Deployment:**
+    Open the `.env` file and fill in all placeholders. **All API keys are required for live data.**
     ```env
-    PAPER_TRADING_MODE=true
+    PAPER_TRADING_MODE=true  # Start with paper trading
     WALLET_KEYPAIR_FILENAME=my_wallet.json
     JITO_AUTH_KEYPAIR_FILENAME=jito_auth_key.json
 
     # --- Fill ALL API Keys ---
     SOLANA_RPC_URL=https://rpc.helius.xyz/?api-key=YOUR_HELIUS_API_KEY_HERE
     JITO_RPC_URL=https://mainnet.block-engine.jito.wtf/api
-    # ... other API keys for data consumers (e.g., Pyth, Twitter, Drift)
+    HELIUS_API_KEY=YOUR_HELIUS_API_KEY_HERE
+    # ... other API keys for data consumers
     ```
 
-### **2. Deploy & Verify Paper Trading (Local or GCP)**
+### **2. Deploy to GCP (Paper Trading Mode)**
 
-1.  **Build Docker Images:**
+**🚀 This is the ONLY deployment method for MemeSnipe v18.**
+
+1.  **Prerequisites:**
+    *   GCP account with billing enabled
+    *   `gcloud` CLI installed and authenticated
+    *   Project ID configured in `.env`
+
+2.  **Deploy to GCP:**
     ```bash
-    docker compose build
+    chmod +x scripts/deploy_vm_gcp.sh
+    ./scripts/deploy_vm_gcp.sh
     ```
-    *Expected Output:* All Docker images should build successfully.
+    *Expected Output:* VM creation, Docker installation, and service deployment.
 
-2.  **Deploy the System (Paper Trading Mode):**
-    ```bash
-    docker compose up -d
-    ```
-    *Expected Output:* All services should be created and started.
+3.  **Access the Dashboard:**
+    The script will output the dashboard URL (typically `http://[VM-IP]:8080`).
+    *Expected Output:* The dashboard should populate with live data-driven paper trades.
 
-3.  **Verify Service Health:**
+4.  **Monitor Logs (SSH to VM):**
     ```bash
-    docker compose ps
-    ```
-    *Expected Output:* All services should show `running` status.
-
-4.  **Monitor Logs (Initial Check):**
-    ```bash
+    gcloud compute ssh meme-snipe-v18 --zone=us-central1-a
     docker compose logs -f executor meta_allocator strategy_factory data_consumers position_manager
     ```
-    *Expected Output:*
-    *   `data_consumers`: Should show logs of fetching and publishing *real* market data.
-    *   `strategy_factory`: Publishing strategy specs (data simulation loop should be commented out for live data).
-    *   `meta_allocator`: Calculating Sharpe ratios and publishing allocations.
-    *   `executor`: Starting strategies, subscribing to event streams, and logging simulated `BUY`/`SELL` trades.
-    *   `position_manager`: Monitoring open paper trades and simulating their closure.
 
-5.  **Access the Dashboard:**
-    Open your web browser and navigate to `http://localhost:8080`.
-    *Expected Output:* The dashboard should populate with live data-driven paper trades, showing PnL, allocations, and strategy performance.
-
-### **3. Go Live (Extreme Caution - Real Funds at Risk)**
+### **3. Go Live on GCP (Extreme Caution - Real Funds at Risk)**
 
 **Proceed only after extensive, successful paper trading with live data and a thorough understanding of all risks.**
 
-1.  **Final `.env` Change:**
-    Open your `.env` file and change `PAPER_TRADING_MODE` to `false`.
-    ```env
-    PAPER_TRADING_MODE=false
+1.  **SSH to GCP VM:**
+    ```bash
+    gcloud compute ssh meme-snipe-v18 --zone=us-central1-a
     ```
 
-2.  **Rebuild and Restart All Services:**
+2.  **Switch to Live Trading:**
     ```bash
-    docker compose build
-    docker compose up -d
+    cd meme-snipe-v18
+    sed -i 's/PAPER_TRADING_MODE=true/PAPER_TRADING_MODE=false/' .env
+    docker compose up -d --build
     ```
-    *Expected Output:* All services will restart. The `executor` will now attempt to execute real trades on the Solana mainnet.
 
 3.  **Intense Monitoring:**
-    *   **Dashboard:** Keep the dashboard open and monitor global PnL, individual strategy performance, and trade history in real-time.
-    *   **Logs:** Continuously tail the logs of the `executor`, `signer`, and `position_manager` services. Look for any errors, failed transactions, or unexpected behavior.
-        ```bash
-        docker compose logs -f executor signer position_manager
-        ```
-    *   **Wallet:** Monitor your actual Solana wallet balance using a block explorer (e.g., Solana Explorer) to confirm trades are executing and funds are moving as expected.
-    *   **Alerts:** Set up external alerts (e.g., Prometheus Alertmanager, custom scripts) to notify you of critical events like failed trades, large drawdowns, or service outages.
+    *   **Dashboard:** Monitor at `http://[VM-IP]:8080`
+    *   **Logs:** Continuously tail the logs for errors or unexpected behavior
+    *   **Wallet:** Monitor your actual Solana wallet balance
+    *   **Alerts:** Set up GCP monitoring alerts for critical events
 
 ---
 

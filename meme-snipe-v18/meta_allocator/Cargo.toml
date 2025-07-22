@@ -1,0 +1,14 @@
+[package]
+name = "meta_allocator"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+shared-models = { path = "../shared-models" }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+redis = { version = "0.25", features = ["tokio-comp"] }
+serde_json = "1.0"
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+statrs = "0.16" # For statistical calculations (mean, std dev for Sharpe)

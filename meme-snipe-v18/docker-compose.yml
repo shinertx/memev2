@@ -1,0 +1,108 @@
+# MemeSnipe v18 - The Alpha Engine Docker Compose
+services:
+  redis:
+    image: redis:7.2-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  signer:
+    build:
+      context: ./signer
+    restart: unless-stopped
+    environment:
+      - RUST_LOG=${LOG_LEVEL:-info}
+      - WALLET_KEYPAIR_PATH=/app/wallet/${WALLET_KEYPAIR_FILENAME}
+    volumes:
+      - ./${WALLET_KEYPAIR_FILENAME}:/app/wallet/${WALLET_KEYPAIR_FILENAME}:ro
+
+  strategy_factory:
+    build:
+      context: ./strategy_factory
+    restart: unless-stopped
+    depends_on: [redis]
+    env_file: .env
+
+  meta_allocator:
+    build:
+      context: ./meta_allocator
+    restart: unless-stopped
+    depends_on: [redis]
+    env_file: .env
+    environment:
+      - RUST_LOG=${LOG_LEVEL:-info}
+
+  executor:
+    build:
+      context: .
+      dockerfile: executor/Dockerfile
+    restart: unless-stopped
+    depends_on: [redis, signer, meta_allocator]
+    ports: ["9184:9184"]
+    env_file: .env
+    environment:
+      - RUST_LOG=${LOG_LEVEL:-info}
+      - JITO_AUTH_KEYPAIR_PATH=/app/wallet/${JITO_AUTH_KEYPAIR_FILENAME}
+    volumes:
+      - ./shared:/app/shared
+      - ./${JITO_AUTH_KEYPAIR_FILENAME}:/app/wallet/${JITO_AUTH_KEYPAIR_FILENAME}:ro
+
+  # Data consumer services (now for live data)
+  bridge_consumer:
+    build: { context: ./data_consumers }
+    command: python bridge_consumer.py
+    restart: unless-stopped
+    depends_on: [redis]
+    env_file: .env
+
+  depth_consumer:
+    build: { context: ./data_consumers }
+    command: python depth_consumer.py
+    restart: unless-stopped
+    depends_on: [redis]
+    env_file: .env
+
+  funding_consumer:
+    build: { context: ./data_consumers }
+    command: python funding_consumer.py
+    restart: unless-stopped
+    depends_on: [redis]
+    env_file: .env
+
+  helius_rpc_price_consumer:
+    build: { context: ./data_consumers }
+    command: python helius_rpc_price_consumer.py
+    restart: unless-stopped
+    depends_on: [redis]
+    env_file: .env
+
+  onchain_consumer: # NEW: for OnChain events
+    build: { context: ./data_consumers }
+    command: python onchain_consumer.py
+    restart: unless-stopped
+    depends_on: [redis]
+    env_file: .env
+
+  position_manager: # NEW SERVICE: for live position monitoring and closing
+    build: { context: ./position_manager }
+    restart: unless-stopped
+    depends_on: [redis, executor, signer] # Depends on executor for DB, signer for closing trades
+    env_file: .env
+    environment:
+      - RUST_LOG=${LOG_LEVEL:-info}
+      - WALLET_KEYPAIR_PATH=/app/wallet/${WALLET_KEYPAIR_FILENAME} # Position manager needs wallet for closing trades
+    volumes:
+      - ./shared:/app/shared:ro # Read-only access to DB
+      - ./${WALLET_KEYPAIR_FILENAME}:/app/wallet/${WALLET_KEYPAIR_FILENAME}:ro
+
+  dashboard:
+    build: { context: ./dashboard }
+    restart: unless-stopped
+    depends_on: [redis, executor]
+    ports: ["8080:5000"]
+    env_file: .env
+    volumes:
+      - ./shared:/app/shared:ro
