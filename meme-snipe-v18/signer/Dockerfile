@@ -1,50 +1,62 @@
-# Stage 1: Build the application
-FROM rust:1.88-slim AS builder
+# syntax=docker/dockerfile:1.4
+FROM rust:1.75-slim AS builder
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends build-essential pkg-config libssl-dev clang \
- && rm -rf /var/lib/apt/lists/*
+ARG BUILDKIT_INLINE_CACHE=1
 
-WORKDIR /app
+RUN --mount=type=cache,target=/var/cache/apt \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    pkg-config \
+    libssl-dev \
+    clang \
+    ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 
-# Copy dependency manifests
-COPY ./Cargo.lock .
-COPY ./signer/Cargo.toml signer/Cargo.toml
-COPY ./shared-models/Cargo.toml shared-models/Cargo.toml
+WORKDIR /build
 
-# Create dummy source files for dependency build
-RUN mkdir -p signer/src shared-models/src && \
-    echo 'fn main(){}' > signer/src/main.rs && \
-    echo 'pub fn lib(){}' > shared-models/src/lib.rs
+# Copy workspace configs
+COPY Cargo.toml Cargo.lock ./
+COPY signer/Cargo.toml signer/
+COPY shared-models/Cargo.toml shared-models/
+COPY executor/Cargo.toml executor/
+COPY meta_allocator/Cargo.toml meta_allocator/
+COPY position_manager/Cargo.toml position_manager/
 
-RUN cargo build --release --workspace
+# Create dummy files
+RUN for member in signer shared-models executor meta_allocator position_manager; do \
+        mkdir -p $member/src && \
+        if [ "$member" = "shared-models" ]; then \
+            echo "pub fn dummy() {}" > $member/src/lib.rs; \
+        else \
+            echo "fn main() {}" > $member/src/main.rs; \
+        fi; \
+    done
 
-# Clean up dummy files
-RUN rm signer/src/*.rs shared-models/src/*.rs
+# Build dependencies
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/build/target \
+    cargo build --release --workspace
 
-# Copy actual source code
-COPY ./signer/src ./signer/src
-COPY ./shared-models/src ./shared-models/src
+# Copy actual source
+RUN rm -rf signer/src shared-models/src
+COPY shared-models/src shared-models/src
+COPY signer/src signer/src
 
 # Build final binary
-RUN cargo build --release --bin signer
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/build/target \
+    cargo build --release --bin signer && \
+    cp target/release/signer /signer
 
+# Runtime - distroless for security
+FROM gcr.io/distroless/cc-debian12
 
-# --- Stage 2: Create the final, minimal image ------------------------------
-FROM debian:bookworm-slim@sha256:46d9c8b8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8
-
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
-
-# Create a non-root user for security
-RUN groupadd --system app && useradd --system --gid app app
-USER app
+COPY --from=builder /signer /app/signer
 
 WORKDIR /app
-
-COPY --from=builder /app/target/release/signer .
-
 EXPOSE 8989
-USER app
 
-CMD ["./signer"]
+ENTRYPOINT ["/app/signer"]

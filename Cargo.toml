@@ -1,12 +1,30 @@
 [workspace]
-members = ["executor","signer","meta_allocator","position_manager","shared-models"]
+members = [
+    "executor",
+    "signer", 
+    "meta_allocator",
+    "position_manager",
+    "shared-models"
+]
+resolver = "2"
 
 [workspace.package]
 edition = "2021"
-rust-version = "1.88"
+version = "18.0.0"
+authors = ["MemeSnipe Team"]
 
 [workspace.dependencies]
-# centralise patched crates
-solana-sdk   = { version = "2.3.1", default-features=false }
-redis        = { version = "0.25.4", features=["tokio-comp"] }
-jito-searcher-client = { git = "https://github.com/jito-labs/searcher-client-rust.git", tag="v0.5.2", features=["ws"] }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+tracing = "0.1"
+redis = { version = "0.25", features = ["tokio-comp"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = true
+panic = "abort"
+opt-level = 3

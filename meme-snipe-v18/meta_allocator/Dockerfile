@@ -1,45 +1,61 @@
-# Stage 1: Build the application
-FROM rust:1.88-slim AS builder
+# syntax=docker/dockerfile:1.4
+FROM rust:1.75-slim AS builder
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends build-essential pkg-config libssl-dev clang \
- && rm -rf /var/lib/apt/lists/*
+ARG BUILDKIT_INLINE_CACHE=1
 
-WORKDIR /app
+RUN --mount=type=cache,target=/var/cache/apt \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    pkg-config \
+    libssl-dev \
+    clang \
+    ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 
-# Copy dependency manifests
-COPY ./Cargo.lock .
-COPY ./meta_allocator/Cargo.toml meta_allocator/Cargo.toml
-COPY ./shared-models/Cargo.toml shared-models/Cargo.toml
+WORKDIR /build
 
-# Create dummy source files for dependency build
-RUN mkdir -p meta_allocator/src shared-models/src && \
-    echo 'fn main(){}' > meta_allocator/src/main.rs && \
-    echo 'pub fn lib(){}' > shared-models/src/lib.rs
+# Copy workspace configs
+COPY Cargo.toml Cargo.lock ./
+COPY meta_allocator/Cargo.toml meta_allocator/
+COPY shared-models/Cargo.toml shared-models/
+COPY executor/Cargo.toml executor/
+COPY signer/Cargo.toml signer/
+COPY position_manager/Cargo.toml position_manager/
 
-RUN cargo build --release --workspace
+# Create dummy files
+RUN for member in meta_allocator shared-models executor signer position_manager; do \
+        mkdir -p $member/src && \
+        if [ "$member" = "shared-models" ]; then \
+            echo "pub fn dummy() {}" > $member/src/lib.rs; \
+        else \
+            echo "fn main() {}" > $member/src/main.rs; \
+        fi; \
+    done
 
-# Clean up dummy files
-RUN rm meta_allocator/src/*.rs shared-models/src/*.rs
+# Build dependencies
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/build/target \
+    cargo build --release --workspace
 
-# Copy actual source code
-COPY ./meta_allocator/src ./meta_allocator/src
-COPY ./shared-models/src ./shared-models/src
+# Copy actual source
+RUN rm -rf meta_allocator/src shared-models/src
+COPY shared-models/src shared-models/src
+COPY meta_allocator/src meta_allocator/src
 
 # Build final binary
-RUN cargo build --release --bin meta_allocator
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/build/target \
+    cargo build --release --bin meta_allocator && \
+    cp target/release/meta_allocator /meta_allocator
 
-# Stage 2: Create the final, minimal image
-FROM debian:bookworm-slim@sha256:46d9c8b8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8
+# Runtime - distroless
+FROM gcr.io/distroless/cc-debian12
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
-
-RUN groupadd --system app && useradd --system --gid app app
-USER app
+COPY --from=builder /meta_allocator /app/meta_allocator
 
 WORKDIR /app
 
-COPY --from=builder /app/target/release/meta_allocator .
-
-CMD ["./meta_allocator"]
+ENTRYPOINT ["/app/meta_allocator"]

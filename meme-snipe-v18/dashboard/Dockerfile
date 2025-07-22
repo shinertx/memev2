@@ -1,18 +1,37 @@
+# syntax=docker/dockerfile:1.4
+FROM python:3.11-slim AS builder
+
+WORKDIR /build
+COPY dashboard/requirements.txt .
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir --target=/install -r requirements.txt
+
+# Runtime
 FROM python:3.11-slim
 
-# Set up a non-root user for security
-RUN groupadd --system app && useradd --system --gid app app
-USER app
+# Install runtime dependencies
+RUN --mount=type=cache,target=/var/cache/apt \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 
-WORKDIR /home/app
+RUN groupadd -g 1000 appuser && \
+    useradd -r -u 1000 -g appuser appuser
 
-COPY --chown=app:app ./dashboard/requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
+COPY --from=builder /install /usr/local/lib/python3.11/site-packages
 
-COPY --chown=app:app . .
+WORKDIR /app
+USER appuser
 
-# Add the user's .local/bin to the PATH for Flask
-ENV PATH="/home/app/.local/bin:${PATH}"
+# Copy application
+COPY --chown=appuser:appuser dashboard/app.py .
+COPY --chown=appuser:appuser dashboard/templates ./templates
+
+# Flask needs write access to instance folder
+RUN mkdir -p /app/instance
+
 EXPOSE 5000
 
-CMD ["flask", "run", "--host=0.0.0.0"]
+CMD ["python", "-m", "flask", "run", "--host=0.0.0.0"]

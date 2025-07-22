@@ -1,53 +1,62 @@
-# MemeSnipe v18 - Optimized Executor Dockerfile
-# Stage 1: Build the application with dependency caching
-FROM rust:1.88-slim AS builder
+# syntax=docker/dockerfile:1.4
+FROM rust:1.75-slim AS builder
 
-# Install build dependencies
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends build-essential pkg-config libssl-dev clang \
- && rm -rf /var/lib/apt/lists/*
+ARG BUILDKIT_INLINE_CACHE=1
+
+RUN --mount=type=cache,target=/var/cache/apt \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    pkg-config \
+    libssl-dev \
+    clang \
+    ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# Copy workspace configs
+COPY Cargo.toml Cargo.lock ./
+COPY executor/Cargo.toml executor/
+COPY shared-models/Cargo.toml shared-models/
+COPY signer/Cargo.toml signer/
+COPY meta_allocator/Cargo.toml meta_allocator/
+COPY position_manager/Cargo.toml position_manager/
+
+# Create dummy files
+RUN for member in executor shared-models signer meta_allocator position_manager; do \
+        mkdir -p $member/src && \
+        if [ "$member" = "shared-models" ]; then \
+            echo "pub fn dummy() {}" > $member/src/lib.rs; \
+        else \
+            echo "fn main() {}" > $member/src/main.rs; \
+        fi; \
+    done
+
+# Build dependencies
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/build/target \
+    cargo build --release --workspace
+
+# Copy actual source
+RUN rm -rf executor/src shared-models/src
+COPY shared-models/src shared-models/src
+COPY executor/src executor/src
+
+# Build final binary
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/build/target \
+    cargo build --release --bin executor && \
+    cp target/release/executor /executor
+
+# Runtime - distroless for security
+FROM gcr.io/distroless/cc-debian12
+
+COPY --from=builder /executor /app/executor
 
 WORKDIR /app
-
-# Copy dependency manifests from the workspace root
-# This allows us to cache the dependency layer
-COPY ./Cargo.lock ./Cargo.lock
-COPY ./executor/Cargo.toml ./executor/Cargo.toml
-COPY ./shared-models/Cargo.toml ./shared-models/Cargo.toml
-
-# Create dummy source files for dependency build (prevents "file not found" errors)
-RUN mkdir -p executor/src && echo "fn main() {}" > executor/src/main.rs
-RUN mkdir -p shared-models/src && echo "pub fn lib() {}" > shared-models/src/lib.rs
-RUN cargo build --release --workspace
-
-# Clean up dummy files
-RUN rm executor/src/*.rs shared-models/src/*.rs
-
-# Now, copy the actual source code
-COPY ./executor/src ./executor/src
-COPY ./shared-models/src ./shared-models/src
-
-# Build the final binary with the cached dependencies
-RUN cargo build --release --bin executor
-
-# Stage 2: Create the final, minimal image
-FROM debian:bookworm-slim@sha256:46d9c8b8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8
-
-# Install only necessary runtime libraries
-RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
-
-# Create a non-root user for security
-RUN groupadd --system app && useradd --system --gid app app
-USER app
-
-WORKDIR /app
-
-# Copy the built binary from the builder stage
-COPY --from=builder /app/target/release/executor .
-
-# Set LIBCLANG_PATH for runtime environment if needed by dynamic libs (e.g., from clang)
-ENV LIBCLANG_PATH=/usr/lib/llvm-14/lib
-
 EXPOSE 9184
 
-CMD ["./executor"]
+ENTRYPOINT ["/app/executor"]
