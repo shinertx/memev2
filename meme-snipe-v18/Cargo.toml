@@ -1,0 +1,71 @@
+[workspace]
+members = [
+    "executor",
+    "signer",
+    "meta_allocator",
+    "position_manager",
+    "shared-models"
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+version = "18.0.0"
+authors = ["MemeSnipe Team"]
+license = "MIT"
+repository = "https://github.com/yourusername/meme-snipe-v18"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1.40", features = ["full"] }
+futures-util = "0.3"
+async-trait = "0.1"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Database & Storage
+redis = { version = "0.25", features = ["tokio-comp", "connection-manager"] }
+rusqlite = { version = "0.31", features = ["bundled", "chrono"] }
+
+# Utilities
+chrono = { version = "0.4", features = ["serde"] }
+base64 = "0.22"
+bincode = "1.3"
+lazy_static = "1.4"
+rand = "0.8"
+
+# Web & Networking
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+axum = "0.7"
+url = "2.5"
+
+# Solana
+solana-client = "1.18"
+solana-sdk = "1.18"
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
+panic = "abort"
+overflow-checks = false
+
+[profile.release-with-debug]
+inherits = "release"
+debug = true
+strip = false
