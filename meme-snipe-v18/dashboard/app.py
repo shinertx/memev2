@@ -33,6 +33,32 @@ def humanize_time_filter(dt):
         dt = datetime.fromtimestamp(dt)
     return humanize.naturaltime(dt)
 
+@app.route('/health')
+def health_check():
+    """Health check endpoint for Docker health checks"""
+    try:
+        # Check Redis connection
+        redis_client.ping()
+        redis_healthy = True
+    except redis.RedisError:
+        redis_healthy = False
+    
+    # Check database connection
+    conn = get_db_connection()
+    db_healthy = conn is not None
+    if conn:
+        conn.close()
+    
+    status = "healthy" if redis_healthy and db_healthy else "unhealthy"
+    return jsonify({
+        "status": status,
+        "timestamp": datetime.now().isoformat(),
+        "services": {
+            "redis": "healthy" if redis_healthy else "unhealthy",
+            "database": "healthy" if db_healthy else "unhealthy"
+        }
+    }), 200 if status == "healthy" else 503
+
 @app.route('/')
 def dashboard():
     # Get active allocations from Redis

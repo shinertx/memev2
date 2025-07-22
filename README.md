@@ -1,6 +1,27 @@
 
 # **🚀 COMPLETE MEMESNIPE v18 - "THE ALPHA ENGINE"**
 
+## **🌐 Live Environment**
+
+### GCP Infrastructure
+- **VM**: `meme-snipe-v18-vm2` (us-central1-a)
+- **External IP**: `146.148.99.199`
+- **Dashboard**: http://146.148.99.199:8080
+- **Prometheus**: http://146.148.99.199:9184
+- **Health Check**: http://146.148.99.199:8080/health
+
+### Quick Access
+```bash
+# SSH into VM
+gcloud compute ssh meme-snipe-v18-vm2 --zone=us-central1-a
+
+# Deploy/Update
+cd meme-snipe-v18 && ./scripts/deploy_vm_gcp.sh
+
+# Monitor
+./scripts/monitor.sh status
+```
+
 ## **📁 Project Structure**
 
 ```
