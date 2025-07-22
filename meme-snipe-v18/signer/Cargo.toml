@@ -16,9 +16,6 @@ bincode = "1.3"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
-[workspace]
-members = ["../shared-models"]
-
 [profile.release]
 lto = "fat"
 codegen-units = 1

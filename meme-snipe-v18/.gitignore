@@ -26,3 +26,7 @@ jito_auth_key.json
 config/
 docker/
 .env
+.env
+.env.save
+test_wallet.json
+my_wallet.json

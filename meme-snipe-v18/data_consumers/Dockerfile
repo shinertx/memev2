@@ -26,13 +26,15 @@ RUN groupadd -g 1000 appuser && \
 COPY --from=builder /install /usr/local/lib/python3.11/site-packages
 
 WORKDIR /app
+
+# Create healthcheck script with proper ownership
+RUN echo '#!/bin/sh\npgrep -f "$1" > /dev/null' > /app/healthcheck.sh && \
+    chmod +x /app/healthcheck.sh && \
+    chown appuser:appuser /app/healthcheck.sh
+
 USER appuser
 
 # Copy application code
 COPY --chown=appuser:appuser data_consumers/*.py ./
-
-# Health check script
-RUN echo '#!/bin/sh\npgrep -f "$1" > /dev/null' > /app/healthcheck.sh && \
-    chmod +x /app/healthcheck.sh
 
 # CMD specified in docker-compose.yml

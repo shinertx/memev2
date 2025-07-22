@@ -16,15 +16,12 @@ RUN --mount=type=cache,target=/var/cache/apt \
 WORKDIR /build
 
 # Copy workspace configs
-COPY Cargo.toml Cargo.lock ./
+COPY meta-allocator-build-Cargo.toml ./Cargo.toml
 COPY meta_allocator/Cargo.toml meta_allocator/
 COPY shared-models/Cargo.toml shared-models/
-COPY executor/Cargo.toml executor/
-COPY signer/Cargo.toml signer/
-COPY position_manager/Cargo.toml position_manager/
 
 # Create dummy files
-RUN for member in meta_allocator shared-models executor signer position_manager; do \
+RUN for member in meta_allocator shared-models; do \
         mkdir -p $member/src && \
         if [ "$member" = "shared-models" ]; then \
             echo "pub fn dummy() {}" > $member/src/lib.rs; \

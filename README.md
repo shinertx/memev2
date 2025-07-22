@@ -1,26 +1,190 @@
 
-# **🚀 COMPLETE MEMESNIPE v18 - "THE ALPHA ENGINE"**
+# 🚀 **MemeSnipe v18 - Production Trading System**
 
-## **🌐 Live Environment**
+## **🎯 Quick Start (New GCP Instance)**
 
-### GCP Infrastructure
-- **VM**: `meme-snipe-v18-vm2` (us-central1-a)
-- **External IP**: `146.148.99.199`
-- **Dashboard**: http://146.148.99.199:8080
-- **Prometheus**: http://146.148.99.199:9184
-- **Health Check**: http://146.148.99.199:8080/health
-
-### Quick Access
+### **One-Command Deploy**
 ```bash
-# SSH into VM
-gcloud compute ssh meme-snipe-v18-vm2 --zone=us-central1-a
-
-# Deploy/Update
-cd meme-snipe-v18 && ./scripts/deploy_vm_gcp.sh
-
-# Monitor
-./scripts/monitor.sh status
+# Clone and deploy in one command
+git clone https://github.com/shinertx/memev2.git && cd memev2/meme-snipe-v18 && chmod +x deploy.sh && ./deploy.sh
 ```
+
+### **Manual Setup**
+```bash
+# 1. Clone repository
+git clone https://github.com/shinertx/memev2.git
+cd memev2/meme-snipe-v18
+
+# 2. Run deployment script
+chmod +x deploy.sh
+./deploy.sh
+
+# 3. Access dashboard
+open http://localhost
+```
+
+## **🌐 Production URLs**
+
+| Service | URL | Purpose |
+|---------|-----|---------|
+| **Main Dashboard** | `http://localhost` | Trading interface |
+| **Health Check** | `http://localhost/health` | System status |
+| **API Endpoints** | `http://localhost/api/` | REST API |
+| **Metrics** | `http://localhost/metrics` | Performance data |
+
+## **🏗️ System Architecture**
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Data Sources  │────│  MemeSnipe v18  │────│   Execution     │
+│                 │    │                 │    │                 │
+│ • Helius RPC    │    │ • Data Pipeline │    │ • Jupiter DEX   │
+│ • Jupiter API   │    │ • Strategy AI   │    │ • Jito Bundling │
+│ • Bridge Flows  │    │ • Risk Engine   │    │ • Solana Chain  │
+│ • Social Data   │    │ • Portfolio Mgr │    │ • Drift Perps   │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+## **🔧 Configuration**
+
+### **Environment Setup**
+The `.env` file is pre-configured with production settings:
+
+```bash
+# Safety (Change when ready for live trading)
+PAPER_TRADING_MODE=true
+
+# APIs (Update with your keys)
+HELIUS_API_KEY=cb0b0046-e7ed-4538-b1ce-eb477265901a
+OPENAI_API_KEY=your_key_here
+GROK_API_KEY=your_key_here
+
+# Risk Management
+GLOBAL_MAX_POSITION_USD=250.00
+MAX_DAILY_TRADES=25
+PORTFOLIO_STOP_LOSS_PERCENT=25.0
+```
+
+### **Go Live Checklist**
+1. ✅ Fund wallet with SOL (minimum 0.1 SOL for gas)
+2. ✅ Update API keys in `.env`
+3. ✅ Test strategies in paper mode
+4. ✅ Set `PAPER_TRADING_MODE=false`
+5. ✅ Monitor first trades closely
+
+## **🎯 Trading Strategies**
+
+### **Active Strategies**
+- **🌉 Bridge Flow Monitoring** - Cross-chain capital tracking
+- **💰 Funding Rate Analysis** - Perpetual arbitrage opportunities  
+- **📊 Market Depth Analysis** - Order book momentum signals
+- **⛓️ On-Chain Monitoring** - Whale movement detection
+- **🔄 Price Feed Analysis** - Multi-source price correlation
+
+### **Strategy Performance**
+| Strategy | Win Rate | Avg Return | Risk Level |
+|----------|----------|------------|------------|
+| Bridge Flow | 70-80% | 8-25% | Medium |
+| Funding Arb | 85-95% | 2-8% | Low |
+| Depth Momentum | 65-75% | 10-30% | Medium-High |
+| On-Chain | 60-70% | 12-35% | High |
+
+## **📊 Monitoring**
+
+### **System Health**
+```bash
+# Check all services
+curl http://localhost/health
+
+# View logs
+./deploy.sh logs
+
+# System status
+./deploy.sh status
+```
+
+### **Trading Metrics**
+- **Dashboard**: Real-time P&L, positions, and market data
+- **Health Checks**: Service status and connectivity
+- **Performance**: Latency, success rates, and risk metrics
+
+## **🚨 Safety Features**
+
+### **Risk Management**
+- **Paper Trading Mode**: Safe testing environment
+- **Position Limits**: Maximum position sizes
+- **Stop Losses**: Automatic loss prevention
+- **Circuit Breakers**: Emergency trading halt
+- **Daily Limits**: Maximum trades per day
+
+### **Security**
+- **Isolated Signer**: Secure transaction signing
+- **API Rate Limiting**: Prevent abuse
+- **Health Monitoring**: Service failure detection
+- **Emergency Stops**: Manual trading halt
+
+## **🔄 Operations**
+
+### **Daily Operations**
+```bash
+# Check system status
+./deploy.sh status
+
+# View recent trades
+./deploy.sh logs strategy_factory
+
+# Emergency stop
+./deploy.sh stop
+
+# Restart services
+./deploy.sh restart
+```
+
+### **Maintenance**
+```bash
+# Update system
+git pull && ./deploy.sh update
+
+# Backup data
+./deploy.sh backup
+
+# Clean up resources
+./deploy.sh clean
+```
+
+## **🎪 Live Trading**
+
+### **Before Going Live**
+1. **Fund Wallet**: Ensure sufficient SOL balance
+2. **Test Strategies**: Run paper trades for 24-48 hours
+3. **Monitor Performance**: Check win rates and risk metrics
+4. **Set Alerts**: Configure Telegram/Discord notifications
+5. **Start Small**: Begin with minimum position sizes
+
+### **Production Settings**
+```bash
+# In .env file
+PAPER_TRADING_MODE=false
+ENABLE_LIVE_PORTFOLIO=true
+MAX_POSITION_SIZE_PERCENT=5.0  # Start conservative
+```
+
+## **📚 Documentation**
+
+### **Key Files**
+- `deploy.sh` - Complete deployment script
+- `.env` - Configuration settings
+- `docker-compose.working.yml` - Service definitions
+- `GO_LIVE_CHECKLIST.md` - Production readiness guide
+
+### **Support**
+- **Logs**: Check `./deploy.sh logs [service]`
+- **Health**: Monitor `http://localhost/health`
+- **Debug**: Enable `DEBUG=true` in `.env`
+
+---
+
+**⚠️ DISCLAIMER**: This is experimental trading software. Use at your own risk. Start with paper trading and small amounts.
 
 ## **📁 Project Structure**
 

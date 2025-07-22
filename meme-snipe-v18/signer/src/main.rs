@@ -1,12 +1,15 @@
 // signer/src/main.rs
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use axum::{extract::State, http::StatusCode, routing::{get, post}, Json, Router};
+use base64::Engine;
 use shared_models::{SignRequest, SignResponse};
 use solana_sdk::{
-    signature::{read_keypair_file, Keypair, Signer},
+    hash::Hash,
+    message::VersionedMessage,
+    signature::{Keypair, Signer},
     transaction::VersionedTransaction,
 };
-use std::{env, net::SocketAddr, sync::Arc};
+use std::{env, fs, net::SocketAddr, sync::Arc};
 use tracing::{error, info, instrument, level_filters::LevelFilter};
 use tracing_subscriber::EnvFilter;
 
@@ -23,9 +26,23 @@ async fn main() -> Result<()> {
 
     info!("🔒 Starting Signer Service...");
 
-    let keypair_path = env::var("WALLET_KEYPAIR_PATH").expect("WALLET_KEYPAIR_PATH must be set");
-    let keypair = read_keypair_file(&keypair_path)
-        .map_err(|e| anyhow!("Failed to read keypair at {}: {}", keypair_path, e))?;
+        let wallet_filename = env::var("WALLET_KEYPAIR_FILENAME")
+        .expect("WALLET_KEYPAIR_FILENAME must be set");
+    let wallet_path = format!("/app/{}", wallet_filename);
+    
+    // Read the JSON array format wallet file
+    let wallet_data = fs::read_to_string(&wallet_path)
+        .map_err(|e| anyhow!("Failed to read wallet file at {}: {}", wallet_path, e))?;
+    
+    let byte_array: Vec<u8> = serde_json::from_str(&wallet_data)
+        .map_err(|e| anyhow!("Failed to parse wallet JSON: {}", e))?;
+    
+    if byte_array.len() != 64 {
+        return Err(anyhow!("Invalid wallet file format: expected 64 bytes, got {}", byte_array.len()));
+    }
+    
+    let keypair = Keypair::from_bytes(&byte_array)
+        .map_err(|e| anyhow!("Failed to create keypair from bytes: {}", e))?;
     
     let pubkey = keypair.pubkey();
     info!(%pubkey, "Wallet loaded successfully. This service is now ready to sign transactions.");
@@ -55,7 +72,7 @@ async fn sign_transaction(
     State(state): State<Arc<AppState>>,
     Json(request): Json<SignRequest>,
 ) -> Result<Json<SignResponse>, StatusCode> {
-    let tx_bytes = match base64::decode(&request.transaction_b64) {
+    let tx_bytes = match base64::engine::general_purpose::STANDARD.decode(&request.transaction_b64) {
         Ok(bytes) => bytes,
         Err(e) => {
             error!(error = %e, "Failed to decode base64 transaction");
@@ -71,9 +88,20 @@ async fn sign_transaction(
         }
     };
 
-    if let Err(e) = tx.sign(&[&state.keypair], tx.message.recent_blockhash()) {
-        error!(error = %e, "Failed to sign transaction");
-        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    // For VersionedTransaction, we need to get the recent blockhash and sign accordingly
+    let recent_blockhash = match &tx.message {
+        VersionedMessage::Legacy(msg) => msg.recent_blockhash,
+        VersionedMessage::V0(msg) => msg.recent_blockhash,
+    };
+    
+    // Create a signature for the transaction
+    let signature = state.keypair.sign_message(&tx.message.serialize());
+    
+    // Set the signature on the transaction
+    if tx.signatures.is_empty() {
+        tx.signatures.push(signature);
+    } else {
+        tx.signatures[0] = signature;
     }
 
     let signed_tx_bytes = match bincode::serialize(&tx) {
@@ -86,6 +114,6 @@ async fn sign_transaction(
 
     info!("Transaction signed successfully.");
     Ok(Json(SignResponse {
-        signed_transaction_b64: base64::encode(&signed_tx_bytes),
+        signed_transaction_b64: base64::engine::general_purpose::STANDARD.encode(&signed_tx_bytes),
     }))
 }

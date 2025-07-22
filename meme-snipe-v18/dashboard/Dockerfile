@@ -23,14 +23,16 @@ RUN groupadd -g 1000 appuser && \
 COPY --from=builder /install /usr/local/lib/python3.11/site-packages
 
 WORKDIR /app
+
+# Create instance directory with proper permissions before switching user
+RUN mkdir -p /app/instance && \
+    chown -R appuser:appuser /app
+
 USER appuser
 
 # Copy application
 COPY --chown=appuser:appuser dashboard/app.py .
 COPY --chown=appuser:appuser dashboard/templates ./templates
-
-# Flask needs write access to instance folder
-RUN mkdir -p /app/instance
 
 EXPOSE 5000
 

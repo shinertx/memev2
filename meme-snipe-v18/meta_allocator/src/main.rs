@@ -5,7 +5,19 @@ use std::collections::HashMap;
 use std::time::Duration;
 use tracing::{info, warn, level_filters::LevelFilter};
 use tracing_subscriber::EnvFilter;
-use statrs::statistics::{Mean, StandardDeviation};
+
+// Simple statistical functions to avoid heavy dependencies
+fn mean(values: &[f64]) -> f64 {
+    if values.is_empty() { 0.0 } else { values.iter().sum::<f64>() / values.len() as f64 }
+}
+
+fn std_dev(values: &[f64]) -> f64 {
+    if values.len() < 2 { 0.0 } else {
+        let m = mean(values);
+        let variance = values.iter().map(|x| (x - m).powi(2)).sum::<f64>() / (values.len() - 1) as f64;
+        variance.sqrt()
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -78,8 +90,8 @@ async fn main() -> Result<()> {
                 .collect();
 
             if pnl_values.len() > 1 {
-                let mean_pnl = pnl_values.mean();
-                let std_dev_pnl = pnl_values.std_dev();
+                let mean_pnl = mean(&pnl_values);
+                let std_dev_pnl = std_dev(&pnl_values);
                 
                 // Calculate Sharpe Ratio (simplified: uses mean PnL as excess return, std dev as risk)
                 // A true Sharpe would use daily returns and risk-free rate

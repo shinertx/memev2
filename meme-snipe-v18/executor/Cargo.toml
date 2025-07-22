@@ -43,9 +43,6 @@ chrono-tz = "0.8" # For Korean time strategy
 # Drift
 drift-sdk = { git = "https://github.com/drift-labs/drift-rs.git", tag = "v2.107.0" }
 
-[workspace]
-members = ["../shared-models"]
-
 # Optimized release profile for maximum performance
 [profile.release]
 lto = "fat"           # Enable Link-Time Optimization across all crates

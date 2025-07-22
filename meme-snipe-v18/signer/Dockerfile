@@ -15,29 +15,22 @@ RUN --mount=type=cache,target=/var/cache/apt \
 
 WORKDIR /build
 
-# Copy workspace configs
-COPY Cargo.toml Cargo.lock ./
-COPY signer/Cargo.toml signer/
+# Copy workspace configs for signer only
+COPY signer-build-Cargo.toml Cargo.toml
+COPY Cargo.lock ./
 COPY shared-models/Cargo.toml shared-models/
-COPY executor/Cargo.toml executor/
-COPY meta_allocator/Cargo.toml meta_allocator/
-COPY position_manager/Cargo.toml position_manager/
+COPY signer/Cargo.toml signer/
 
-# Create dummy files
-RUN for member in signer shared-models executor meta_allocator position_manager; do \
-        mkdir -p $member/src && \
-        if [ "$member" = "shared-models" ]; then \
-            echo "pub fn dummy() {}" > $member/src/lib.rs; \
-        else \
-            echo "fn main() {}" > $member/src/main.rs; \
-        fi; \
-    done
+# Create dummy files for signer and shared-models only
+RUN mkdir -p signer/src shared-models/src && \
+    echo "fn main() {}" > signer/src/main.rs && \
+    echo "pub fn dummy() {}" > shared-models/src/lib.rs
 
 # Build dependencies
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/build/target \
-    cargo build --release --workspace
+    cargo build --release --package signer
 
 # Copy actual source
 RUN rm -rf signer/src shared-models/src
@@ -48,11 +41,17 @@ COPY signer/src signer/src
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/build/target \
-    cargo build --release --bin signer && \
+    cargo build --release --package signer && \
     cp target/release/signer /signer
 
-# Runtime - distroless for security
-FROM gcr.io/distroless/cc-debian12
+# Runtime - minimal debian with necessary tools
+FROM debian:12-slim
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ca-certificates \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /signer /app/signer
 
