@@ -5,81 +5,95 @@
 
 ```
 meme-snipe-v18/
-├── .env.example
-├── .gitignore
-├── docker-compose.yml
-├── executor/
-│   ├── Cargo.toml
-│   ├── Dockerfile
-│   └── src/
-│       ├── main.rs
-│       ├── config.rs
-│       ├── database.rs
-│       ├── executor.rs
-│       ├── jito_client.rs
-│       ├── jupiter.rs
-│       ├── portfolio_monitor.rs
-│       ├── signer_client.rs
-│       └── strategies/
-│           ├── mod.rs
-│           ├── airdrop_rotation.rs
-│           ├── bridge_inflow.rs
-│           ├── dev_wallet_drain.rs
-│           ├── korean_time_burst.rs
-│           ├── liquidity_migration.rs
-│           ├── mean_revert_1h.rs
-│           ├── momentum_5m.rs
-│           ├── perp_basis_arb.rs
-│           ├── rug_pull_sniffer.rs
-│           └── social_buzz.rs
-├── signer/
-│   ├── Cargo.toml
-│   ├── Dockerfile
-│   └── src/
-│       └── main.rs
-├── shared-models/
-│   ├── Cargo.toml
-│   └── src/
-│       └── lib.rs
-├── strategy_factory/
-│   ├── Dockerfile
-│   ├── factory.py
-│   └── requirements.txt
-├── meta_allocator/
-│   ├── Cargo.toml
-│   ├── Dockerfile
-│   └── src/
-│       └── main.rs
-├── data_consumers/
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   ├── bridge_consumer.py
-│   ├── depth_consumer.py
-│   ├── funding_consumer.py
-│   ├── helius_rpc_price_consumer.py
-│   └── onchain_consumer.py  <-- NEW (for OnChain events)
-├── position_manager/  <-- NEW SERVICE
-│   ├── Cargo.toml
-│   ├── Dockerfile
-│   └── src/
-│       ├── main.rs
-│       ├── config.rs
-│       ├── database.rs
-│       ├── jupiter.rs
-│       ├── signer_client.rs
-│       └── position_monitor.rs
-├── dashboard/
-│   ├── requirements.txt
-│   ├── Dockerfile
-│   ├── app.py
-│   └── templates/
-│       └── index.html
+├── Cargo.lock (149KB, 6281 lines)
+├── docker-compose.yml (3.0KB, 109 lines)
+├── env.example (1.4KB, 36 lines)
+├── jito_auth_key.json (234B, 1 lines)
+├── my_wallet.json (232B, 1 lines)
+├── prometheus.yml (128B, 8 lines)
+├── .gitignore (239B, 24 lines)
+├── target/ (build artifacts)
+├── shared/ (.gitkeep only)
+├── config/ (empty)
+├── docker/ (empty)
 ├── docs/
-│   └── STRATEGY_TEMPLATE.md
-├── prometheus.yml
-└── scripts/
-    └── deploy_vm_gcp.sh
+│   └── STRATEGY_TEMPLATE.md (3.3KB, 79 lines)
+├── scripts/
+│   └── deploy_vm_gcp.sh (7.2KB, 148 lines)
+├── shared-models/
+│   ├── Cargo.toml (154B, 9 lines)
+│   └── src/
+│       └── lib.rs (3.8KB, 131 lines)
+├── executor/
+│   ├── Cargo.toml (1.6KB, 55 lines)
+│   ├── Dockerfile (1.7KB, 53 lines)
+│   └── src/
+│       ├── main.rs (1.1KB, 37 lines)
+│       ├── config.rs (2.7KB, 52 lines)
+│       ├── database.rs (6.2KB, 170 lines)
+│       ├── executor.rs (19KB, 359 lines)
+│       ├── jito_client.rs (3.3KB, 73 lines)
+│       ├── jupiter.rs (4.3KB, 113 lines)
+│       ├── portfolio_monitor.rs (3.5KB, 76 lines)
+│       ├── signer_client.rs (1.0KB, 33 lines)
+│       └── strategies/
+│           ├── mod.rs (1.3KB, 43 lines)
+│           ├── airdrop_rotation.rs (2.4KB, 54 lines)
+│           ├── bridge_inflow.rs (2.2KB, 55 lines)
+│           ├── dev_wallet_drain.rs (2.2KB, 49 lines)
+│           ├── korean_time_burst.rs (2.7KB, 58 lines)
+│           ├── liquidity_migration.rs (2.3KB, 55 lines)
+│           ├── mean_revert_1h.rs (3.4KB, 68 lines)
+│           ├── momentum_5m.rs (2.8KB, 62 lines)
+│           ├── perp_basis_arb.rs (3.6KB, 77 lines)
+│           ├── rug_pull_sniffer.rs (1.8KB, 42 lines)
+│           └── social_buzz.rs (3.4KB, 72 lines)
+├── signer/
+│   ├── Cargo.toml (526B, 27 lines)
+│   ├── Dockerfile (1.3KB, 47 lines)
+│   └── src/
+│       └── main.rs (3.0KB, 92 lines)
+├── meta_allocator/
+│   ├── Cargo.toml (447B, 15 lines)
+│   ├── Dockerfile (1.3KB, 45 lines)
+│   └── src/
+│       └── main.rs (6.2KB, 136 lines)
+├── position_manager/
+│   ├── Cargo.toml (1.0KB, 41 lines)
+│   ├── Dockerfile (1.6KB, 50 lines)
+│   └── src/
+│       ├── main.rs (829B, 31 lines)
+│       ├── config.rs (1.3KB, 34 lines)
+│       ├── database.rs (4.0KB, 118 lines)
+│       ├── jupiter.rs (3.8KB, 109 lines)
+│       ├── position_monitor.rs (7.4KB, 159 lines)
+│       └── signer_client.rs (1.1KB, 34 lines)
+├── data_consumers/
+│   ├── Dockerfile (247B, 11 lines)
+│   ├── requirements.txt (82B, 4 lines)
+│   ├── bridge_consumer.py (1.2KB, 35 lines)
+│   ├── depth_consumer.py (1.6KB, 44 lines)
+│   ├── funding_consumer.py (1.2KB, 36 lines)
+│   ├── helius_rpc_price_consumer.py (2.2KB, 61 lines)
+│   └── onchain_consumer.py (1.8KB, 45 lines)
+├── dashboard/
+│   ├── Dockerfile (429B, 19 lines)
+│   ├── app.py (5.1KB, 133 lines)
+│   ├── requirements.txt (63B, 5 lines)
+│   └── templates/
+│       └── index.html (10KB, 176 lines)
+└── strategy_factory/
+    ├── Dockerfile (161B, 11 lines)
+    ├── factory.py (3.3KB, 86 lines)
+    └── requirements.txt (13B, 2 lines)
 ```
+
+**Total Files:** 50+ files across 8 main directories
+**Rust Services:** 4 (executor, signer, meta_allocator, position_manager)
+**Python Services:** 6 (5 data consumers + strategy_factory)
+**Web Services:** 1 (dashboard)
+**Strategies:** 10 trading strategies in executor
+**Configuration:** Docker Compose, environment templates, deployment scripts
 
 ---
 

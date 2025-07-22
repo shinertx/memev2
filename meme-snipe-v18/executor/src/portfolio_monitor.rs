@@ -9,7 +9,13 @@ use redis::AsyncCommands; // P-7: For Redis Streams
 pub async fn run_monitor(db: Arc<Database>, portfolio_paused_flag: Arc<tokio::sync::Mutex<bool>>) {
     info!("📈 Starting Portfolio Monitor (P-6)...");
     let redis_url = CONFIG.redis_url.clone();
-    let client = redis::Client::open(redis_url).unwrap();
+    let client = match redis::Client::open(redis_url) {
+        Ok(client) => client,
+        Err(e) => {
+            error!("Failed to create Redis client: {}", e);
+            return;
+        }
+    };
 
     let mut highest_water_mark_pnl = 0.0; // Track highest PnL achieved
     let mut current_pnl = 0.0;

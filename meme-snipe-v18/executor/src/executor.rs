@@ -23,22 +23,22 @@ pub struct MasterExecutor {
 }
 
 impl MasterExecutor {
-    pub async fn new(db: Arc<Database>) -> Self {
+    pub async fn new(db: Arc<Database>) -> Result<Self> {
         // Initialize JitoClient and DriftClient correctly with their respective new() or connect methods
-        let jito_client = Arc::new(JitoClient::new(&CONFIG.jito_rpc_url).await.unwrap());
-        let drift_client = Arc::new(DriftClient::connect(DriftNet::Mainnet, None).await.unwrap()); // None for optional wallet
+        let jito_client = Arc::new(JitoClient::new(&CONFIG.jito_rpc_url).await?);
+        let drift_client = Arc::new(DriftClient::connect(DriftNet::Mainnet, None).await?); // None for optional wallet
 
-        Self {
+        Ok(Self {
             db,
             active_strategies: HashMap::new(),
             event_router_senders: HashMap::new(),
-            redis_client: redis::Client::open(CONFIG.redis_url.clone()).unwrap(),
+            redis_client: redis::Client::open(CONFIG.redis_url.clone())?,
             jupiter_client: Arc::new(JupiterClient::new()),
             sol_usd_price: Arc::new(tokio::sync::Mutex::new(1.0)), // P-2: Default to 1.0, will be updated by consumer
             portfolio_paused: Arc::new(tokio::sync::Mutex::new(false)), // P-6: Not paused by default
             jito_client, // Correct initialization
             drift_client, // Correct initialization
-        }
+        })
     }
 
     // simple getter for monitor

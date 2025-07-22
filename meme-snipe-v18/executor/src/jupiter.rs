@@ -54,7 +54,7 @@ pub struct JupiterClient {
 impl JupiterClient {
     pub fn new() -> Self {
         Self {
-            client: Client::builder().timeout(Duration::from_secs(15)).build().unwrap(),
+            client: Client::builder().timeout(Duration::from_secs(15)).build().expect("Failed to build HTTP client"),
         }
     }
 

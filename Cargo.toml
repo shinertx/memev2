@@ -1,0 +1,12 @@
+[workspace]
+members = ["executor","signer","meta_allocator","position_manager","shared-models"]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.88"
+
+[workspace.dependencies]
+# centralise patched crates
+solana-sdk   = { version = "2.3.1", default-features=false }
+redis        = { version = "0.25.4", features=["tokio-comp"] }
+jito-searcher-client = { git = "https://github.com/jito-labs/searcher-client-rust.git", tag="v0.5.2", features=["ws"] }

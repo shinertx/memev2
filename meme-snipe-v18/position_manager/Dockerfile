@@ -1,10 +1,11 @@
 # MemeSnipe v18 - Position Manager Dockerfile
 # Stage 1: Build the application
-FROM rust:1.75-slim@sha256:e0b2b5c7e2fb0ad3f7ac44c8ed06d4694931a7201c13d8031a0e0513e9a7e939 AS builder
+FROM rust:1.88-slim AS builder
 
 # Install build dependencies
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends build-essential pkg-config libssl-dev clang
+    apt-get install -y --no-install-recommends build-essential pkg-config libssl-dev clang \
+ && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -29,7 +30,7 @@ COPY ./shared-models/src ./shared-models/src
 RUN cargo build --release --bin position_manager
 
 # Stage 2: Create the final, minimal image
-FROM debian:bookworm-slim
+FROM debian:bookworm-slim@sha256:46d9c8b8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8c8
 
 # Install only necessary runtime libraries
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
