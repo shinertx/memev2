@@ -1,0 +1,289 @@
+version: '3.8'
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  redis:
+    image: redis:7.2-alpine
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    volumes:
+      - redis_data:/data
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "allkeys-lru"]
+    networks:
+      - backend
+
+  signer:
+    build:
+      context: .
+      dockerfile: signer/Dockerfile
+      cache_from:
+        - ${DOCKER_REGISTRY:-local}/meme-snipe:signer-cache
+    image: ${DOCKER_REGISTRY:-local}/meme-snipe:signer
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      - RUST_LOG=${LOG_LEVEL:-info}
+      - RUST_BACKTRACE=1
+      - WALLET_KEYPAIR_PATH=/app/secrets/wallet.json
+    volumes:
+      - type: bind
+        source: ./${WALLET_KEYPAIR_FILENAME}
+        target: /app/secrets/wallet.json
+        read_only: true
+    networks:
+      - backend
+    expose:
+      - "8989"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8989/pubkey"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  strategy_factory:
+    build:
+      context: .
+      dockerfile: strategy_factory/Dockerfile
+    image: ${DOCKER_REGISTRY:-local}/meme-snipe:strategy-factory
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - backend
+
+  meta_allocator:
+    build:
+      context: .
+      dockerfile: meta_allocator/Dockerfile
+      cache_from:
+        - ${DOCKER_REGISTRY:-local}/meme-snipe:meta-allocator-cache
+    image: ${DOCKER_REGISTRY:-local}/meme-snipe:meta-allocator
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      - RUST_LOG=${LOG_LEVEL:-info}
+      - RUST_BACKTRACE=1
+    networks:
+      - backend
+
+  executor:
+    build:
+      context: .
+      dockerfile: executor/Dockerfile
+      cache_from:
+        - ${DOCKER_REGISTRY:-local}/meme-snipe:executor-cache
+    image: ${DOCKER_REGISTRY:-local}/meme-snipe:executor
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      redis:
+        condition: service_healthy
+      signer:
+        condition: service_healthy
+      meta_allocator:
+        condition: service_started
+    ports:
+      - "${EXECUTOR_METRICS_PORT:-9184}:9184"
+    env_file: .env
+    environment:
+      - RUST_LOG=${LOG_LEVEL:-info}
+      - RUST_BACKTRACE=1
+      - JITO_AUTH_KEYPAIR_PATH=/app/secrets/jito.json
+      - DATABASE_PATH=/app/data/trades.db
+    volumes:
+      - type: bind
+        source: ./shared
+        target: /app/data
+      - type: bind
+        source: ./${JITO_AUTH_KEYPAIR_FILENAME}
+        target: /app/secrets/jito.json
+        read_only: true
+    networks:
+      - backend
+      - monitoring
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9184/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  bridge_consumer:
+    build:
+      context: .
+      dockerfile: data_consumers/Dockerfile
+    image: ${DOCKER_REGISTRY:-local}/meme-snipe:data-consumer
+    restart: unless-stopped
+    logging: *default-logging
+    command: ["python", "-u", "bridge_consumer.py"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - backend
+
+  depth_consumer:
+    build:
+      context: .
+      dockerfile: data_consumers/Dockerfile
+    image: ${DOCKER_REGISTRY:-local}/meme-snipe:data-consumer
+    restart: unless-stopped
+    logging: *default-logging
+    command: ["python", "-u", "depth_consumer.py"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - backend
+
+  funding_consumer:
+    build:
+      context: .
+      dockerfile: data_consumers/Dockerfile
+    image: ${DOCKER_REGISTRY:-local}/meme-snipe:data-consumer
+    restart: unless-stopped
+    logging: *default-logging
+    command: ["python", "-u", "funding_consumer.py"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - backend
+
+  helius_rpc_price_consumer:
+    build:
+      context: .
+      dockerfile: data_consumers/Dockerfile
+    image: ${DOCKER_REGISTRY:-local}/meme-snipe:data-consumer
+    restart: unless-stopped
+    logging: *default-logging
+    command: ["python", "-u", "helius_rpc_price_consumer.py"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - backend
+
+  onchain_consumer:
+    build:
+      context: .
+      dockerfile: data_consumers/Dockerfile
+    image: ${DOCKER_REGISTRY:-local}/meme-snipe:data-consumer
+    restart: unless-stopped
+    logging: *default-logging
+    command: ["python", "-u", "onchain_consumer.py"]
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - backend
+
+  position_manager:
+    build:
+      context: .
+      dockerfile: position_manager/Dockerfile
+      cache_from:
+        - ${DOCKER_REGISTRY:-local}/meme-snipe:position-manager-cache
+    image: ${DOCKER_REGISTRY:-local}/meme-snipe:position-manager
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      redis:
+        condition: service_healthy
+      executor:
+        condition: service_healthy
+      signer:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      - RUST_LOG=${LOG_LEVEL:-info}
+      - RUST_BACKTRACE=1
+      - DATABASE_PATH=/app/data/trades.db
+    volumes:
+      - type: bind
+        source: ./shared
+        target: /app/data
+    networks:
+      - backend
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: dashboard/Dockerfile
+    image: ${DOCKER_REGISTRY:-local}/meme-snipe:dashboard
+    restart: unless-stopped
+    logging: *default-logging
+    depends_on:
+      redis:
+        condition: service_healthy
+      executor:
+        condition: service_started
+    ports:
+      - "${DASHBOARD_PORT:-8080}:5000"
+    env_file: .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - DATABASE_PATH=/app/data/trades.db
+      - FLASK_ENV=production
+    volumes:
+      - type: bind
+        source: ./shared
+        target: /app/data
+        read_only: true
+    networks:
+      - backend
+      - frontend
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge
+    internal: true
+  monitoring:
+    driver: bridge
+
+volumes:
+  redis_data:
+    driver: local
