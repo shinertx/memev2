@@ -25,3 +25,4 @@ jito_auth_key.json
 # junk
 config/
 docker/
+.env
