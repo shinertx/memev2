@@ -68,21 +68,91 @@ def pnl_color(pnl):
 @app.route('/health')
 def health_check():
     """Health check endpoint for Docker health checks"""
-    # ... (existing code)
+    try:
+        # Check Redis
+        redis_client.ping()
+        # Check DB
+        conn = get_db_connection()
+        if conn:
+            conn.close()
+            return jsonify({"status": "healthy", "service": "dashboard"}), 200
+        else:
+            return jsonify({"status": "unhealthy", "error": "DB connection failed"}), 503
+    except Exception as e:
+        return jsonify({"status": "unhealthy", "error": str(e)}), 503
 
 @app.route('/api/system/status')
 def system_status():
     """Enhanced system status with API monitoring"""
-    # ... (existing code)
+    status = {
+        "redis": "unknown",
+        "database": "unknown",
+        "api_manager": "not available",
+        "timestamp": datetime.utcnow().isoformat()
+    }
+    
+    # Check Redis
+    try:
+        redis_client.ping()
+        status["redis"] = "healthy"
+    except:
+        status["redis"] = "unhealthy"
+    
+    # Check Database
+    conn = get_db_connection()
+    if conn:
+        try:
+            conn.execute("SELECT 1")
+            status["database"] = "healthy"
+        except:
+            status["database"] = "unhealthy"
+        finally:
+            conn.close()
+    else:
+        status["database"] = "connection failed"
+    
+    # Check API Manager
+    if API_MANAGER_AVAILABLE:
+        try:
+            status["api_manager"] = "available"
+            status["api_endpoints"] = api_manager.get_all_endpoints()
+        except:
+            status["api_manager"] = "error"
+    
+    return jsonify(status)
 
 @app.route('/api/urls/health')
 def api_urls_health():
     """Check health of all external API URLs"""
-    # ... (existing code)
+    if not API_MANAGER_AVAILABLE:
+        return jsonify({"error": "API Manager not available"}), 503
+    
+    try:
+        health_results = api_manager.check_all_endpoints()
+        recommendations = generate_api_recommendations(health_results)
+        
+        return jsonify({
+            "timestamp": datetime.utcnow().isoformat(),
+            "results": health_results,
+            "recommendations": recommendations
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 def generate_api_recommendations(health_results):
     """Generate recommendations based on API health"""
-    # ... (existing code)
+    recommendations = []
+    
+    for endpoint, result in health_results.items():
+        if not result.get("healthy", False):
+            if "timeout" in result.get("error", "").lower():
+                recommendations.append(f"Consider increasing timeout for {endpoint}")
+            elif "rate limit" in result.get("error", "").lower():
+                recommendations.append(f"Implement rate limiting backoff for {endpoint}")
+            else:
+                recommendations.append(f"Check API credentials for {endpoint}")
+    
+    return recommendations
 
 def calculate_drawdown(pnl_series):
     """Calculates the maximum drawdown from a PnL series."""
@@ -188,7 +258,30 @@ def dashboard():
 
 @app.route('/api/trades')
 def api_trades():
-    # ... (existing code)
+    """Return recent trades as JSON for API consumption."""
+    try:
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({'error': 'Database connection failed'}), 503
+        
+        trades = pd.read_sql_query(
+            "SELECT * FROM trades ORDER BY entry_time DESC LIMIT 100", 
+            conn
+        ).to_dict('records')
+        conn.close()
+        
+        return jsonify([{
+            'timestamp': trade.get('entry_time', ''),
+            'symbol': trade.get('symbol', ''),
+            'side': trade.get('side', ''),
+            'amount': trade.get('amount', 0),
+            'price': trade.get('entry_price', 0),
+            'pnl': trade.get('pnl_usd', 0),
+            'strategy': trade.get('strategy_id', '')
+        } for trade in trades])
+    except Exception as e:
+        print(f"Error fetching trades: {e}")
+        return jsonify({'error': 'Failed to fetch trades'}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

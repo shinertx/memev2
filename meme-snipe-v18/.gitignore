@@ -50,3 +50,17 @@ build/
 tmp/
 temp/
 .tmp/
+
+# Old files backup
+old-files-backup/
+
+# No alternative Docker files
+Dockerfile.*
+!Dockerfile.rust
+!Dockerfile.python
+docker-compose.*.yml
+!docker-compose.yml
+
+# Build artifacts
+*-build-Cargo.toml
+rollback_*.txt

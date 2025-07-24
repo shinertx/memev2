@@ -1,0 +1,27 @@
+[package]
+name = "shared"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+# Workspace dependencies
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+sqlx = { workspace = true }
+redis = { workspace = true }
+tracing = { workspace = true }
+solana-sdk = { workspace = true }
+uuid = { workspace = true }
+
+# Shared-specific dependencies
+once_cell = "1.19"
+strum = { version = "0.25", features = ["derive"] }
+strum_macros = "0.25"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }

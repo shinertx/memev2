@@ -1,6 +1,6 @@
 # MemeSnipe v18 - Production Makefile
 
-.PHONY: help deploy start stop restart status logs update backup clean health test build
+.PHONY: help deploy start stop restart status logs update backup clean health test build cargo-verify cargo-clean-deps cargo-update-smart cargo-tree cargo-bloat validate-env
 
 # Default target
 all: help
@@ -68,6 +68,56 @@ build:
 	export DOCKER_BUILDKIT=1
 	sudo docker compose -f docker-compose.working.yml build
 
+cargo-verify: ## Verify all Cargo.toml files are valid
+	@echo "Verifying workspace configuration..."
+	@cargo metadata --no-deps > /dev/null
+	@echo "Checking all workspace members..."
+	@for member in $$(cargo metadata --no-deps --format-version 1 | jq -r '.workspace_members[]' | cut -d' ' -f1); do \
+		echo "✓ $$member"; \
+	done
+
+cargo-clean-deps: ## Remove unused dependencies
+	@echo "Installing cargo-machete..."
+	@cargo install cargo-machete --locked
+	@echo "Checking for unused dependencies..."
+	@cargo machete
+
+cargo-update-smart: ## Update dependencies with compatibility checks
+	@echo "Installing cargo-edit..."
+	@cargo install cargo-edit --locked
+	@echo "Checking for updates..."
+	@cargo update --dry-run
+	@echo "Run 'cargo update' to apply updates"
+
+cargo-tree: ## Show dependency tree
+	@cargo tree --workspace
+
+cargo-bloat: ## Analyze binary size
+	@echo "Installing cargo-bloat..."
+	@cargo install cargo-bloat --locked
+	@cargo bloat --release --crates
+
+validate-env: ## Validate .env configuration
+	@chmod +x scripts/validate-env.sh
+	@./scripts/validate-env.sh
+
+setup: validate-env ## Initial setup and validation
+	@echo "🚀 Setting up MemeSnipe v18..."
+	@if [ ! -f .env ]; then \
+		echo "Creating .env from template..."; \
+		cp .env.example .env; \
+		echo "⚠️  Please edit .env with your configuration"; \
+		exit 1; \
+	fi
+	@echo "✅ Setup complete"
+
+pre-deploy: validate-env cargo-verify ## Pre-deployment checks
+	@echo "🔍 Running pre-deployment checks..."
+	@echo "✅ All checks passed"
+
+# Update the all target to include validation
+all: validate-env check-cargo test perf-build ## Run validation, tests and build all images
+
 # Legacy aliases for compatibility
 up: start
-down: stop 
+down: stop

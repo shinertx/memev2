@@ -84,6 +84,9 @@ data_consumers → executor    →   risk_guardian   →   wallet_guard    →  
 All services are built using one of two universal Dockerfiles, ensuring consistency and maintainability.
 - **`Dockerfile.rust`**: A multi-stage, performance-tuned (`jemalloc`) file for all Rust services.
 - **`Dockerfile.python`**: A universal file for all Python services.
+- **`docker-compose.yml`**: THE ONLY COMPOSE FILE - NO OTHER COMPOSE FILES SHOULD EXIST OR BE CREATED.
+
+⚠️ **IMPORTANT**: If you see references to `docker-compose.prod.yml`, `docker-compose.dev.yml`, or any other compose variants, they are OUTDATED. Only `docker-compose.yml` exists.
 
 ### Strategy Development Workflow
 1. **Copy `docs/STRATEGY_TEMPLATE.md`** - Every strategy starts with documentation.
@@ -115,23 +118,26 @@ pub trait Strategy {
 The entire system is managed via a single, canonical Compose file.
 ```bash
 # Build all services using the canonical Dockerfiles
-docker compose -f docker-compose.prod.yml build --parallel
+docker compose build --parallel
 
 # Deploy the entire stack (trading + observability)
-docker compose -f docker-compose.prod.yml up -d
+docker compose up -d
 
 # Check status of all services
-docker compose -f docker-compose.prod.yml ps
+docker compose ps
 
 # View logs for a specific service
-docker compose -f docker-compose.prod.yml logs -f executor
+docker compose logs -f executor
+
+# ⚠️ NEVER use -f flag with compose files, there is only ONE docker-compose.yml
 ```
 
 ### Configuration Management
-- **Primary Config**: `docker-compose.prod.yml` is the single source of truth.
+- **Primary Config**: `docker-compose.yml` is the ONLY compose file.
 - **Environment**: Copy `.env.example` → `.env` and configure API keys.
 - **Wallet Setup**: Place `my_wallet.json` and `jito_auth_key.json` in project root.
 - **Trading Mode**: Control via `PAPER_TRADING_MODE=true/false` in `.env`.
+- **NO VARIANTS**: Do not create .prod, .dev, .test compose files - use environment variables instead.
 
 ### Database & State Management
 - **SQLite**: Trade history and performance metrics in `shared/trades_v18.db`.
@@ -189,7 +195,7 @@ docker compose -f docker-compose.prod.yml logs -f executor
 - **Integration Tests**: Full Docker Compose stack testing via `deploy.sh` (to be updated).
 - **Paper Trading**: Extended testing phase before live trading promotion.
 
-When working with this codebase, always use `docker-compose.prod.yml` as the single source of truth for infrastructure. Verify trading mode before making changes that affect order execution, and understand the Redis Stream event flow when adding new data sources or strategies.
+When working with this codebase, always use `docker compose` (no -f flag needed) as there is only one compose file. Verify trading mode before making changes that affect order execution, and understand the Redis Stream event flow when adding new data sources or strategies.
 
 ## Development Patterns
 
@@ -247,7 +253,7 @@ cargo test --all               # Run Rust tests only
 ### Trading Mode Controls
 - **Paper Trading**: Default mode, simulates trades without real money
 - **Live Trading**: Set `PAPER_TRADING_MODE=false` in `.env` and restart
-- **Mode Promotion**: Meta allocator can promote strategies from Paper → Live based on performance
+- **Mode Promotion**: Autonomous Meallocator can promote strategies from Paper → Live based on performance
 
 ### Risk Management Integration
 - **Portfolio Stop-Loss**: `portfolio_monitor.rs` halts trading on drawdown limits
@@ -290,4 +296,4 @@ cargo test --all               # Run Rust tests only
 - **Integration Tests**: Full Docker Compose stack testing via `deploy.sh`
 - **Paper Trading**: Extended testing phase before live trading promotion
 
-When working with this codebase, always verify trading mode before making changes that affect order execution, and understand the Redis Stream event flow when adding new data sources or strategies.
+When working with this codebase, always use `docker compose` (no -f flag needed) as there is only one compose file. Verify trading mode before making changes that affect order execution, and understand the Redis Stream event flow when adding new data sources or strategies.

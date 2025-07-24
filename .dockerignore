@@ -1,190 +1,46 @@
-# Git
-.git/
-.gitignore
-.gitattributes
-.gitmodules
+# Ignore everything first
+**
 
-# Documentation
-*.md
-README*
-LICENSE*
-CHANGELOG*
-docs/
-documentation/
+# Allow specific directories and files needed for build
+!Cargo.toml
+!Cargo.lock
+!rust-toolchain.toml
+!executor/
+!autonomous_allocator/
+!risk_guardian/
+!position_manager/
+!wallet_guard/
+!signer/
+!shared/
+!drift-rs/
+!data_consumers/
+!strategy_factory/
+!dashboard/
 
-# Development files
-.env
-.env.*
-!.env.example
-*.local
-.editorconfig
-.prettierrc*
-.eslintrc*
-
-# Secrets and sensitive files
-*.pem
-*.key
-*.crt
-*.p12
-my_wallet.json
-jito_auth_key.json
-*_keypair.json
-secrets/
-credentials/
-
-# Build artifacts
-target/
+# Exclude build artifacts and caches
 **/target/
-dist/
-build/
-*.o
-*.so
-*.dylib
-*.dll
-*.exe
-*.out
-*.app
-
-# Dependencies
-node_modules/
-**/node_modules/
-bower_components/
-vendor/
-
-# Package manager files
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-.pnpm-store/
-package-lock.json
-yarn.lock
-Cargo.lock
-
-# Python
-__pycache__/
+**/*.pyc
 **/__pycache__/
-*.py[cod]
-*$py.class
-*.egg-info/
-.Python
-pip-log.txt
-pip-delete-this-directory.txt
-.venv/
-venv/
-env/
-ENV/
+**/.pytest_cache/
+**/node_modules/
+**/.env
+**/.env.*
+!**/.env.example
 
-# Logs
-*.log
-logs/
-*.log.*
-.logs/
+# Exclude sensitive files
+**/my_wallet.json
+**/jito_auth_key.json
+**/trades_v18.db
+**/*.key
+**/*.pem
 
-# Testing
-test/
-tests/
-coverage/
-.coverage
-.pytest_cache/
-.tox/
-*.cover
-*.coverage
-htmlcov/
-
-# IDEs and editors
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.project
-.classpath
-.settings/
-*.sublime-workspace
-*.sublime-project
-.history/
-
-# OS files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-desktop.ini
-
-# Archives
-*.tar
-*.tar.gz
-*.zip
-*.gz
-*.tgz
-*.bz2
-*.7z
-*.rar
-*.jar
-*.war
-*.ear
-
-# Temporary files
-tmp/
-temp/
-.tmp/
-.temp/
-*.tmp
-*.temp
-*.bak
-*.backup
-*.cache
-
-# Local development
-local/
-.local/
-scratch/
-playground/
-
-# Scripts not needed in containers
-scripts/
-deploy/
-deployment/
-Makefile
-makefile
-
-# Configuration files not needed in build
-config/local/
-*.local.yml
-*.local.yaml
-*.local.json
-
-# Database files
-*.db
-*.sqlite
-*.sqlite3
-shared/
-
-# Docker files
-docker-compose.override.yml
-docker-compose.override.yaml
-.dockerignore
-Dockerfile.*
-
-# Monitoring/metrics
-prometheus.yml
-grafana/
-
-# CI/CD
-.github/
-.gitlab-ci.yml
-.travis.yml
-.circleci/
-jenkins/
-.drone.yml
-
-# Misc development files
-TODO*
-NOTES*
-scratch.*
-*.orig
-.env.vault 
+# Exclude development files
+**/.git/
+**/.gitignore
+**/.github/
+**/tests/
+**/docs/
+**/scripts/
+**/*.md
+**/.vscode/
+**/.idea/
