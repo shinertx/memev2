@@ -1,0 +1,58 @@
+groups:
+- name: service_alerts
+  rules:
+  - alert: InstanceDown
+    expr: up == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Instance {{ $labels.instance }} down"
+      description: "{{ $labels.job }} instance {{ $labels.instance }} has been down for more than 1 minute."
+
+  - alert: HighRedisMemoryUsage
+    expr: redis_memory_used_bytes / redis_total_system_memory_bytes * 100 > 80
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High Redis memory usage"
+      description: "Redis memory usage is at {{ $value | printf `%.2f` }}% on instance {{ $labels.instance }}."
+
+- name: data_consumer_alerts
+  rules:
+  - alert: NoDepthEventsPublished
+    expr: rate(depth_events_published_total[5m]) == 0
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Depth consumer is not publishing events"
+      description: "The depth_consumer has not published any events to Redis in the last 2 minutes."
+
+  - alert: NoOnChainEventsPublished
+    expr: rate(onchain_events_published_total[5m]) == 0
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "OnChain consumer is not publishing events"
+      description: "The onchain_consumer has not published any events to Redis in the last 5 minutes."
+
+  - alert: NoFundingEventsPublished
+    expr: rate(funding_events_published_total[5m]) == 0
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Funding consumer is not publishing events"
+      description: "The funding_consumer has not published any events to Redis in the last 10 minutes."
+
+  - alert: NoSocialEventsPublished
+    expr: rate(social_events_published_total[10m]) == 0
+    for: 15m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Social consumer is not publishing events"
+      description: "The social_consumer has not published any events to Redis in the last 15 minutes."

@@ -4,10 +4,20 @@ import time
 import random
 import os
 
+# Ensure all strategies in executor/src/strategies/ are registered
 STRATEGY_FAMILIES = [
-    "momentum_5m", "mean_revert_1h", "social_buzz", "liquidity_migration",
-    "perp_basis_arb", "dev_wallet_drain", "airdrop_rotation",
-    "korean_time_burst", "bridge_inflow", "rug_pull_sniffer"
+    "momentum_5m", 
+    "mean_revert_1h", 
+    "social_buzz", 
+    "liquidity_migration",
+    "perp_basis_arb", 
+    "dev_wallet_drain", 
+    "airdrop_rotation",
+    "korean_time_burst", 
+    "bridge_inflow", 
+    "rug_pull_sniffer"
+    # TODO: Add any additional strategies found in executor/src/strategies/
+    # Exclude: template.rs.example
 ]
 
 def get_default_params(family):

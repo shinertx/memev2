@@ -1,10 +1,46 @@
 global:
   scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - "prometheus.rules.yml"
 
 scrape_configs:
   - job_name: 'executor'
     static_configs:
       - targets: ['executor:9184']
+  - job_name: 'executor-prometheus'
+    static_configs:
+      - targets: ['executor:9090']
+    metrics_path: '/metrics'
   - job_name: 'signer'
     static_configs:
       - targets: ['signer:8989']
+  - job_name: 'risk-guardian'
+    static_configs:
+      - targets: ['risk_guardian:8081']
+    metrics_path: '/metrics'
+  - job_name: 'depth-consumer'
+    static_configs:
+      - targets: ['depth_consumer:8000']
+    metrics_path: '/metrics'
+  - job_name: 'onchain-consumer'
+    static_configs:
+      - targets: ['onchain_consumer:8001']
+    metrics_path: '/metrics'
+  - job_name: 'funding-consumer'
+    static_configs:
+      - targets: ['funding_consumer:8002']
+    metrics_path: '/metrics'
+  - job_name: 'enhanced-price-consumer'
+    static_configs:
+      - targets: ['enhanced_price_consumer:8003']
+    metrics_path: '/metrics'
+  - job_name: 'helius-rpc-price-consumer'
+    static_configs:
+      - targets: ['helius_rpc_price_consumer:8004']
+    metrics_path: '/metrics'
+  - job_name: 'social-consumer'
+    static_configs:
+      - targets: ['social_consumer:8005']
+    metrics_path: '/metrics'

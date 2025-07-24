@@ -1,0 +1,13 @@
+NAMES                                        IMAGE                               STATUS                   PORTS
+meme-snipe-nginx                             nginx:alpine                        Up 3 hours (unhealthy)   0.0.0.0:80->80/tcp, [::]:80->80/tcp
+meme-snipe-v18-signer-1                      local/meme-snipe:signer             Up 4 hours (unhealthy)   8989/tcp
+relaxed_mcclintock                           local/meme-snipe:signer             Up 4 hours               8989/tcp
+gracious_hamilton                            local/meme-snipe:signer             Up 4 hours               8989/tcp
+meme-snipe-v18-funding_consumer-1            local/meme-snipe:data-consumer      Up 4 hours               
+meme-snipe-v18-bridge_consumer-1             local/meme-snipe:data-consumer      Up 4 hours               
+meme-snipe-v18-strategy_factory-1            local/meme-snipe:strategy-factory   Up 4 hours               
+meme-snipe-v18-depth_consumer-1              local/meme-snipe:data-consumer      Up 4 hours               
+meme-snipe-v18-dashboard-1                   local/meme-snipe:dashboard          Up 4 hours (unhealthy)   5000/tcp, 0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp
+meme-snipe-v18-helius_rpc_price_consumer-1   local/meme-snipe:data-consumer      Up 4 hours               
+meme-snipe-v18-onchain_consumer-1            local/meme-snipe:data-consumer      Up 4 hours               
+meme-snipe-v18-redis-1                       redis:7.2-alpine                    Up 4 hours (healthy)     6379/tcp

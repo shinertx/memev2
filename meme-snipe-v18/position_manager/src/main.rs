@@ -2,8 +2,8 @@
 mod config;
 mod database;
 mod jupiter;
-mod signer_client;
-mod position_monitor; // Main logic for monitoring
+mod position_monitor;
+mod signer_client; // Main logic for monitoring
 
 use crate::config::CONFIG;
 use anyhow::Result;
@@ -22,7 +22,7 @@ async fn main() -> Result<()> {
     info!(version = %env!("CARGO_PKG_VERSION"), "📈 Starting MemeSnipe Position Manager v18...");
 
     let db = Arc::new(Database::new(&CONFIG.database_path)?);
-    
+
     // Start the position monitoring loop
     position_monitor::run_monitor(db.clone()).await?;
 

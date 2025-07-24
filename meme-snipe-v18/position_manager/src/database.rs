@@ -3,13 +3,13 @@
 // to ensure it has its own independent DB connection and logic.
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
-use rusqlite::{params, Connection, Row};
-use shared_models::OrderDetails;
+use rusqlite::{params, Connection};
 use std::path::Path;
 use tracing::info;
 
 // --- Trade Record Struct ---
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub struct TradeRecord {
     pub id: i64,
     pub strategy_id: String,
@@ -39,7 +39,7 @@ impl Database {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        let conn = Connection::open(path).with_context(|| format!("Failed to open database at {}", db_path))?;
+        let conn = Connection::open(db_path).with_context(|| format!("Failed to open database at {db_path}"))?;
         info!("Database opened at {}", db_path);
         Self::init_db(&conn)?;
         Ok(Self { conn })
@@ -70,7 +70,9 @@ impl Database {
     }
 
     pub fn get_open_trades(&self) -> Result<Vec<TradeRecord>> {
-        let mut stmt = self.conn.prepare("SELECT * FROM trades WHERE status = 'OPEN'")?;
+        let mut stmt = self
+            .conn
+            .prepare("SELECT * FROM trades WHERE status = 'OPEN'")?;
         let trades_iter = stmt.query_map([], |row| {
             Ok(TradeRecord {
                 id: row.get(0)?,
@@ -90,15 +92,27 @@ impl Database {
                 highest_price_usd: row.get(14)?,
             })
         })?;
-        trades_iter.collect::<Result<Vec<TradeRecord>, rusqlite::Error>>().map_err(anyhow::Error::from)
+        trades_iter
+            .collect::<Result<Vec<TradeRecord>, rusqlite::Error>>()
+            .map_err(anyhow::Error::from)
     }
 
+    #[allow(dead_code)]
     pub fn update_trade_status(&self, trade_id: i64, status: &str) -> Result<()> {
-        self.conn.execute("UPDATE trades SET status = ?1 WHERE id = ?2", params![status, trade_id])?;
+        self.conn.execute(
+            "UPDATE trades SET status = ?1 WHERE id = ?2",
+            params![status, trade_id],
+        )?;
         Ok(())
     }
 
-    pub fn update_trade_pnl(&self, trade_id: i64, status: &str, close_price_usd: f64, pnl_usd: f64) -> Result<()> {
+    pub fn update_trade_pnl(
+        &self,
+        trade_id: i64,
+        status: &str,
+        close_price_usd: f64,
+        pnl_usd: f64,
+    ) -> Result<()> {
         let now: DateTime<Utc> = Utc::now();
         self.conn.execute(
             "UPDATE trades SET status = ?1, close_time = ?2, close_price_usd = ?3, pnl_usd = ?4 WHERE id = ?5",

@@ -1,65 +1,91 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MemeSnipe v18 Dashboard</title>
+    <title>MemeSnipe v18 - Institutional Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
     <style>
-        body { background-color: #030712; color: #f9fafb; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"; }
-        .card { background-color: #111827; border: 1px solid #1f2937; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
-        .table-container { max-height: 80vh; overflow-y: auto; }
-        th, td { padding: 0.75rem 1.5rem; }
-        thead th { background-color: #1f2937; }
-        .header-bg { background-color: #0d111b; }
+        body { background-color: #030712; color: #f9fafb; font-family: 'Inter', ui-sans-serif, system-ui; }
+        .card { background-color: #111827; border: 1px solid #1f2937; }
+        .table-container { max-height: 300px; overflow-y: auto; }
+        thead th { background-color: #1f2937; position: sticky; top: 0; z-index: 10; }
+        .header-bg { background: linear-gradient(to right, #1f2937, #111827); }
+        .kpi-value { transition: color 0.3s ease-in-out; }
     </style>
-    <meta http-equiv="refresh" content="10">
 </head>
 <body class="p-4 sm:p-6 lg:p-8">
-    <div class="max-w-7xl mx-auto">
-        <header class="text-center mb-8 header-bg p-6 rounded-lg">
-            <h1 class="text-4xl font-bold text-purple-400">MemeSnipe v18</h1>
-            <p class="text-slate-400">The Alpha Engine - Live Trading Platform</p>
+    <div class="max-w-full mx-auto">
+        <header class="text-center mb-8 header-bg p-6 rounded-lg shadow-lg">
+            <h1 class="text-4xl font-bold text-purple-400 tracking-wider">MemeSnipe v18</h1>
+            <p class="text-slate-400">Institutional-Grade Performance & Risk Dashboard</p>
         </header>
 
         <!-- Global KPIs -->
-        <section class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+        <section class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 mb-8">
             <div class="card p-6 rounded-lg text-center">
-                <h3 class="text-lg font-semibold text-slate-400">Total Strategies</h3>
-                <p class="text-4xl font-bold text-white">{{ num_strategies }}</p>
+                <h3 class="text-lg font-semibold text-slate-400">Global PnL</h3>
+                <p class="text-4xl font-bold kpi-value {{ pnl_color(global_kpis.pnl) }}">{{ format_pnl(global_kpis.pnl) }}</p>
             </div>
             <div class="card p-6 rounded-lg text-center">
-                <h3 class="text-lg font-semibold text-slate-400">Active Allocations</h3>
-                <p class="text-4xl font-bold text-white">{{ allocations | length }}</p>
+                <h3 class="text-lg font-semibold text-slate-400">Total Trades</h3>
+                <p class="text-4xl font-bold text-white">{{ global_kpis.trades }}</p>
             </div>
             <div class="card p-6 rounded-lg text-center">
-                <h3 class="text-lg font-semibold text-slate-400">Global Portfolio PnL</h3>
-                <p class="text-4xl font-bold {% if global_total_pnl > 0 %}text-green-400{% elif global_total_pnl < 0 %}text-red-400{% else %}text-white{% endif %}">${{ "%.2f"|format(global_total_pnl) }}</p>
+                <h3 class="text-lg font-semibold text-slate-400">Win Rate</h3>
+                <p class="text-4xl font-bold text-white">{{ "%.1f"|format(global_kpis.win_rate) }}%</p>
             </div>
             <div class="card p-6 rounded-lg text-center">
-                <h3 class="text-lg font-semibold text-slate-400">Global Win Rate</h3>
-                <p class="text-4xl font-bold text-white">{{ "%.1f"|format(global_win_rate) }}%</p>
+                <h3 class="text-lg font-semibold text-slate-400">Annualized Sharpe</h3>
+                <p class="text-4xl font-bold kpi-value {{ pnl_color(global_kpis.sharpe) }}">{{ "%.2f"|format(global_kpis.sharpe) }}</p>
+            </div>
+            <div class="card p-6 rounded-lg text-center">
+                <h3 class="text-lg font-semibold text-slate-400">Max Drawdown</h3>
+                <p class="text-4xl font-bold text-red-500">{{ "%.2f"|format(global_kpis.max_drawdown * 100) }}%</p>
             </div>
         </section>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8">
-            <!-- Strategy Registry -->
-            <div class="card p-6 rounded-lg xl:col-span-1">
-                <h2 class="text-2xl font-bold mb-4 text-white">Strategy Registry</h2>
+        <!-- Charts Section -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <div class="card p-6 rounded-lg">
+                <h2 class="text-2xl font-bold mb-4 text-white">Global PnL Over Time</h2>
+                <canvas id="globalPnlChart"></canvas>
+            </div>
+            <div class="card p-6 rounded-lg">
+                <h2 class="text-2xl font-bold mb-4 text-white">Strategy PnL Contribution</h2>
+                <canvas id="strategyPnlChart"></canvas>
+            </div>
+        </section>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Strategy Performance -->
+            <div class="card p-6 rounded-lg lg:col-span-2">
+                <h2 class="text-2xl font-bold mb-4 text-white">Strategy Performance</h2>
                 <div class="table-container">
                     <table class="w-full text-sm text-left">
-                        <thead class="text-xs text-slate-400 uppercase sticky top-0">
+                        <thead class="text-xs text-slate-400 uppercase">
                             <tr>
-                                <th scope="col" class="px-6 py-3">Family</th>
-                                <th scope="col" class="px-6 py-3">ID</th>
-                                <th scope="col" class="px-6 py-3">Params</th>
+                                <th>Strategy ID</th>
+                                <th>Weight</th>
+                                <th>PnL</th>
+                                <th>Sharpe</th>
+                                <th>Max DD</th>
+                                <th>Trades</th>
+                                <th>Win Rate</th>
                             </tr>
                         </thead>
                         <tbody>
-                        {% for spec in specs %}
+                        {% for id, perf in strategy_performance.items() %}
+                            {% set alloc = allocations.get(id, {'weight': 0}) %}
                             <tr class="border-b border-slate-700">
-                                <td class="px-6 py-4 font-medium text-purple-400">{{ spec.family }}</td>
-                                <td class="px-6 py-4 font-mono text-xs text-slate-300">{{ spec.id }}</td>
-                                <td class="px-6 py-4 font-mono text-xs text-slate-300">{{ spec.params | tojson }}</td>
+                                <td class="py-2 font-mono text-xs text-purple-400">{{ id }}</td>
+                                <td class="py-2 font-bold">{{ "%.3f"|format(alloc.weight) }}</td>
+                                <td class="py-2 font-bold {{ pnl_color(perf.total_pnl) }}">{{ format_pnl(perf.total_pnl) }}</td>
+                                <td class="py-2 {{ pnl_color(perf.sharpe_ratio) }}">{{ "%.2f"|format(perf.sharpe_ratio) }}</td>
+                                <td class="py-2 text-red-500">{{ "%.2f"|format(perf.max_drawdown * 100) }}%</td>
+                                <td class="py-2">{{ perf.trade_count }}</td>
+                                <td class="py-2">{{ "%.1f"|format(perf.win_rate) }}%</td>
                             </tr>
                         {% endfor %}
                         </tbody>
@@ -67,31 +93,24 @@
                 </div>
             </div>
 
-            <!-- Active Allocations & Performance -->
-            <div class="card p-6 rounded-lg lg:col-span-2 xl:col-span-2">
-                <h2 class="text-2xl font-bold mb-4 text-white">Active Allocations & Performance</h2>
+            <!-- Risk & Events -->
+            <div class="card p-6 rounded-lg">
+                <h2 class="text-2xl font-bold mb-4 text-white">Risk Events</h2>
                 <div class="table-container">
                     <table class="w-full text-sm text-left">
-                        <thead class="text-xs text-slate-400 uppercase sticky top-0">
+                        <thead class="text-xs text-slate-400 uppercase">
                             <tr>
-                                <th scope="col" class="px-6 py-3">Strategy ID</th>
-                                <th scope="col" class="px-6 py-3">Weight</th>
-                                <th scope="col" class="px-6 py-3">Sharpe</th>
-                                <th scope="col" class="px-6 py-3">PnL</th>
-                                <th scope="col" class="px-6 py-3">Trades</th>
-                                <th scope="col" class="px-6 py-3">Win Rate</th>
+                                <th>Time</th>
+                                <th>Event</th>
+                                <th>Severity</th>
                             </tr>
                         </thead>
                         <tbody>
-                        {% for alloc in allocations %}
-                            {% set perf = strategy_performance.get(alloc.id, {'total_pnl': 0, 'trade_count': 0, 'win_rate': 0, 'sharpe_ratio': 0}) %}
-                             <tr class="border-b border-slate-700">
-                                <td class="px-6 py-4 font-mono text-xs text-slate-300">{{ alloc.id }}</td>
-                                <td class="px-6 py-4 font-bold text-white">{{ "%.3f"|format(alloc.weight) }}</td>
-                                <td class="px-6 py-4 {% if alloc.sharpe_ratio > 0 %}text-green-400{% elif alloc.sharpe_ratio < 0 %}text-red-400{% else %}text-white{% endif %}">{{ "%.2f"|format(alloc.sharpe_ratio) }}</td>
-                                <td class="px-6 py-4 {% if perf.total_pnl > 0 %}text-green-400{% elif perf.total_pnl < 0 %}text-red-400{% else %}text-white{% endif %}">${{ "%.2f"|format(perf.total_pnl) }}</td>
-                                <td class="px-6 py-4 text-white">{{ perf.trade_count }}</td>
-                                <td class="px-6 py-4 text-white">{{ "%.1f"|format(perf.win_rate) }}%</td>
+                        {% for event in risk_events %}
+                            <tr class="border-b border-slate-700">
+                                <td class="py-2 text-slate-400">{{ event.timestamp | format_time }}</td>
+                                <td class="py-2">{{ event.event_type }}</td>
+                                <td class="py-2 font-bold text-yellow-400">{{ event.severity }}</td>
                             </tr>
                         {% endfor %}
                         </tbody>
@@ -99,24 +118,34 @@
                 </div>
             </div>
 
-            <!-- Trade History (Full Width) -->
-            <div class="card p-6 rounded-lg lg:col-span-2 xl:col-span-3">
-                <h2 class="text-2xl font-bold mb-4 text-white">Trade History</h2>
+            <!-- Recent Trades -->
+            <div class="card p-6 rounded-lg lg:col-span-3">
+                <h2 class="text-2xl font-bold mb-4 text-white">Recent Trades</h2>
                 <div class="table-container">
                     <table class="w-full text-sm text-left">
-                        <thead class="text-xs text-slate-400 uppercase sticky top-0">
+                        <thead class="text-xs text-slate-400 uppercase">
                             <tr>
-                                <th scope="col" class="px-6 py-3">Time</th>
-                                <th scope="col" class="px-6 py-3">Strategy</th>
-                                <th scope="col" class="px-6 py-3">Token</th>
-                                <th scope="col" class="px-6 py-3">Action</th>
-                                <th scope="col" class="px-6 py-3">Size (USD)</th>
-                                <th scope="col" class="px-6 py-3">PnL (USD)</th>
-                                <th scope="col" class="px-6 py-3">Status</th>
-                                <th scope="col" class="px-6 py-3">Confidence</th>
+                                <th>Time</th>
+                                <th>Strategy</th>
+                                <th>Symbol</th>
+                                <th>Side</th>
+                                <th>Size (USD)</th>
+                                <th>PnL (USD)</th>
+                                <th>Status</th>
                             </tr>
                         </thead>
-                        <tbody id="trade-history-body">
+                        <tbody>
+                        {% for trade in recent_trades %}
+                            <tr class="border-b border-slate-700">
+                                <td class="py-2 text-slate-400">{{ trade.entry_time | format_time }}</td>
+                                <td class="py-2 font-mono text-xs text-purple-400">{{ trade.strategy_id }}</td>
+                                <td class="py-2 font-mono text-xs">{{ trade.symbol }}</td>
+                                <td class="py-2">{{ trade.side }}</td>
+                                <td class="py-2">{{ format_pnl(trade.amount_usd) }}</td>
+                                <td class="py-2 font-bold {{ pnl_color(trade.pnl_usd) }}">{{ format_pnl(trade.pnl_usd) }}</td>
+                                <td class="py-2">{{ trade.status }}</td>
+                            </tr>
+                        {% endfor %}
                         </tbody>
                     </table>
                 </div>
@@ -125,51 +154,43 @@
     </div>
 
     <script>
-        async function fetchTradeHistory() {
-            try {
-                const response = await fetch('/api/trades');
-                if (!response.ok) {
-                    console.error("Failed to fetch trades:", response.status);
-                    return;
-                }
-                const trades = await response.json();
-                const tbody = document.getElementById('trade-history-body');
-                tbody.innerHTML = '';
-                if (trades.error) {
-                    tbody.innerHTML = `<tr><td colspan="8" class="text-center p-4 text-red-400">${trades.error}</td></tr>`;
-                    return;
-                }
-                trades.forEach(trade => {
-                    const tr = document.createElement('tr');
-                    tr.className = 'border-b border-slate-700';
-
-                    const entryTime = new Date(trade.entry_time * 1000).toLocaleString();
-                    const action = trade.side === 'Long' ? 'BUY' : (trade.side === 'Short' ? 'SHORT' : 'UNKNOWN'); // Use side for action
-
-                    const pnl = trade.pnl_usd !== null ? `$${trade.pnl_usd.toFixed(2)}` : 'N/A';
-                    const pnlClass = trade.pnl_usd > 0 ? 'text-green-400' : (trade.pnl_usd < 0 ? 'text-red-400' : 'text-white');
-                    const statusClass = trade.status.includes('PROFIT') ? 'text-green-400' : 
-                                        (trade.status.includes('LOSS') ? 'text-red-400' : 'text-yellow-400');
-
-                    tr.innerHTML = `
-                        <td class="px-6 py-4 text-slate-300">${entryTime}</td>
-                        <td class="px-6 py-4 text-purple-400">${trade.strategy_id}</td>
-                        <td class="px-6 py-4 font-medium text-white">${trade.token_address}</td>
-                        <td class="px-6 py-4 text-white">${action}</td>
-                        <td class="px-6 py-4 text-white">$${trade.amount_usd.toFixed(2)}</td>
-                        <td class="px-6 py-4 font-bold ${pnlClass}">${pnl}</td>
-                        <td class="px-6 py-4 font-medium ${statusClass}">${trade.status}</td>
-                        <td class="px-6 py-4 text-slate-300">${trade.confidence.toFixed(2)}</td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-            } catch (error) {
-                console.error("Failed to fetch trade history:", error);
-                const tbody = document.getElementById('trade-history-body');
-                tbody.innerHTML = `<tr><td colspan="8" class="text-center p-4 text-red-400">Error loading trade history.</td></tr>`;
+        const chartsData = JSON.parse('{{ charts_data | safe }}');
+        
+        // Global PnL Chart
+        new Chart(document.getElementById('globalPnlChart'), {
+            type: 'line',
+            data: {
+                labels: chartsData.global_pnl.labels,
+                datasets: [{
+                    label: 'Cumulative PnL',
+                    data: chartsData.global_pnl.data,
+                    borderColor: 'rgb(168, 85, 247)',
+                    backgroundColor: 'rgba(168, 85, 247, 0.1)',
+                    fill: true,
+                    tension: 0.1
+                }]
+            },
+            options: {
+                scales: { x: { type: 'time', time: { unit: 'day' } } }
             }
-        }
-        document.addEventListener('DOMContentLoaded', fetchTradeHistory);
+        });
+
+        // Strategy PnL Contribution Chart
+        const strategyPnlData = Object.entries({{ strategy_performance | tojson | safe }})
+            .sort((a, b) => b[1].total_pnl - a[1].total_pnl);
+            
+        new Chart(document.getElementById('strategyPnlChart'), {
+            type: 'bar',
+            data: {
+                labels: strategyPnlData.map(d => d[0]),
+                datasets: [{
+                    label: 'Total PnL by Strategy',
+                    data: strategyPnlData.map(d => d[1].total_pnl),
+                    backgroundColor: strategyPnlData.map(d => d[1].total_pnl > 0 ? 'rgba(74, 222, 128, 0.6)' : 'rgba(248, 113, 113, 0.6)'),
+                }]
+            },
+            options: { indexAxis: 'y' }
+        });
     </script>
 </body>
 </html>

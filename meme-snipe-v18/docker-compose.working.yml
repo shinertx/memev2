@@ -1,5 +1,3 @@
-version: '3.8'
-
 x-logging: &default-logging
   driver: "json-file"
   options:
@@ -59,14 +57,16 @@ services:
       - FLASK_ENV=production
       - REDIS_URL=redis://redis:6379
     ports:
-      - "8080:8080"
+      - "8080:5000"
+    volumes:
+      - ./shared:/app/shared
     networks:
       - backend
     depends_on:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -177,17 +177,97 @@ services:
         read_only: true
     networks:
       - backend
-    expose:
-      - "8989"
+    ports:
+      - "8989:8989"
     depends_on:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8989/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8989/pubkey"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+
+  analysis:
+    image: ${DOCKER_REGISTRY:-local}/meme-snipe:data-consumer
+    restart: unless-stopped
+    logging: *default-logging
+    user: "0:0"  # Run as root to access shared files
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - CONSUMER_TYPE=analysis
+      - DB_PATH=/app/shared/trades_v18.db
+    command: ["python", "-u", "alpha_decay_monitor.py"]
+    volumes:
+      - ./shared:/app/shared
+    networks:
+      - backend
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  watchdog:
+    image: ${DOCKER_REGISTRY:-local}/meme-snipe:data-consumer
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - CONSUMER_TYPE=watchdog
+    command: ["python", "-u", "watchdog_service.py"]
+    networks:
+      - backend
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  risk_guardian:
+    build: ./risk_guardian
+    container_name: risk_guardian
+    volumes:
+      - ./shared:/app/shared
+      - ./my_wallet.json:/app/my_wallet.json:ro
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - RUST_LOG=info
+      - RISK_CHECK_INTERVAL_MS=1000
+      - MAX_PORTFOLIO_DRAWDOWN=${MAX_PORTFOLIO_DRAWDOWN:-0.15}
+      - MAX_POSITION_SIZE_USD=${MAX_POSITION_SIZE_USD:-10000}
+      - DAILY_LOSS_LIMIT_USD=${DAILY_LOSS_LIMIT_USD:-5000}
+    depends_on:
+      - redis
+    networks:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  wallet_guard:
+    build: ./wallet_guard
+    container_name: wallet_guard
+    volumes:
+      - ./my_wallet.json:/app/my_wallet.json:ro
+      - ./shared:/app/shared:ro
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - RUST_LOG=info
+      - MAX_DAILY_TRANSACTIONS=100
+      - MAX_TRANSACTION_SIZE_SOL=10.0
+    depends_on:
+      - redis
+    networks:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Note: Executor, Meta-Allocator, and Position Manager are disabled due to dependency issues
   # They need Rust 1.81+ and jito-searcher-client authentication
@@ -200,3 +280,74 @@ services:
   # 
   # position_manager:
   #   # Disabled - requires jito-searcher-client authentication
+
+  # ============================================================================
+  # MONITORING STACK - Full Prometheus/Grafana Integration
+  # ============================================================================
+  
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    logging: *default-logging
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus.rules.yml:/etc/prometheus/prometheus.rules.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - monitoring
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    logging: *default-logging
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    networks:
+      - monitoring
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  backend:
+    driver: bridge
+    internal: false  # Allow external internet access for API calls
+  monitoring:
+    driver: bridge
+
+volumes:
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  logs:
+    driver: local

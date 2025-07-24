@@ -1,5 +1,7 @@
-# Rust
-/target
+# Rust build artifacts
+/target/
+**/target/
+*.pdb
 .rustc_info.json
 Cargo.lock
 
@@ -12,21 +14,39 @@ __pycache__/
 .mypy_cache/
 .venv/
 venv/
-
-# Local Environment & Secrets
 .env
+*.pyc
+
+# Secrets & Wallets (CRITICAL - DO NOT COMMIT)
 my_wallet.json
 jito_auth_key.json
-
-# General
-.DS_Store
-/shared
-
-# junk
-config/
-docker/
-.env
-.env
-.env.save
 test_wallet.json
-my_wallet.json
+*.json
+
+# Database & Logs
+*.db
+*.db-shm
+*.db-wal
+logs/
+*.log
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# System files
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build outputs
+dist/
+build/
+
+# Temporary files
+tmp/
+temp/
+.tmp/

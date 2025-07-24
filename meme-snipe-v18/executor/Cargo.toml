@@ -18,11 +18,14 @@ reqwest = { version = "0.12", features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 url = "2.5"
+prometheus = "0.13"
+axum-prometheus = "0.4"
 
 # Solana & Jito
-solana-client = "1.18"
-solana-sdk = "1.18"
-jito-searcher-client = { git = "https://github.com/jito-labs/searcher-client-rust.git", tag = "v0.4.0", features = ["ws"] }
+solana-client = { workspace = true }
+solana-sdk = { workspace = true }
+# Jito integration (temporarily disabled for build)
+# jito-searcher-client = { git = "https://github.com/jito-labs/searcher-client.git", tag = "v0.4.0", features = ["ws"] }
 
 # Database & Storage
 rusqlite = { version = "0.31", features = ["bundled", "chrono"] }
@@ -41,7 +44,7 @@ rand = "0.8" # For simulated PnL
 chrono-tz = "0.8" # For Korean time strategy
 
 # Drift
-drift-sdk = { git = "https://github.com/drift-labs/drift-rs.git", tag = "v2.107.0" }
+# drift-rs = { git = "https://github.com/drift-labs/drift-rs.git", tag = "v1.0.0-alpha.14" }
 
 # Optimized release profile for maximum performance
 [profile.release]

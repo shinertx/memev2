@@ -1,12 +1,12 @@
 
-# 🚀 **MemeSnipe v18 - Production Trading System**
+# 🚀 **MemeSnipe v18 - Unified Autonomous Trading System**
 
-## **🎯 Quick Start (New GCP Instance)**
+## **🎯 Quick Start (Unified Deployment)**
 
 ### **One-Command Deploy**
 ```bash
 # Clone and deploy in one command
-git clone https://github.com/shinertx/memev2.git && cd memev2/meme-snipe-v18 && chmod +x deploy.sh && ./deploy.sh
+git clone https://github.com/shinertx/memev2.git && cd memev2/meme-snipe-v18 && ./deploy.sh
 ```
 
 ### **Manual Setup**
@@ -15,13 +15,180 @@ git clone https://github.com/shinertx/memev2.git && cd memev2/meme-snipe-v18 && 
 git clone https://github.com/shinertx/memev2.git
 cd memev2/meme-snipe-v18
 
-# 2. Run deployment script
+# 2. Set wallet permissions (MANDATORY)
+chmod 400 my_wallet.json
+chmod 400 jito_auth_key.json
+
+# 3. Run deployment script
 chmod +x deploy.sh
 ./deploy.sh
 
-# 3. Access dashboard
-open http://localhost
+# 4. Access System Interfaces
+open http://localhost      # Main Dashboard
+open http://localhost:3000 # Grafana Monitoring
 ```
+
+## **🌐 Production URLs**
+
+| Service | URL | Purpose |
+|---|---|---|
+| **Main Dashboard** | `http://localhost` | Trading interface & PnL |
+| **Grafana** | `http://localhost:3000` | **Primary Monitoring**: System Health, Latency, Risk |
+| **Prometheus** | `http://localhost:9090` | Ad-hoc metric queries |
+| **Health Check** | `http://localhost/health` | Basic system status |
+
+## Architecture Overview (Unified)
+
+MemeSnipe v18 is a production-ready autonomous trading system for Solana memecoins using a microservices architecture. **All services are managed via `docker-compose.prod.yml`**.
+
+```
+                                     ┌───────────────────┐
+                                     │  Observability    │
+                                     │ (Grafana/Prometheus)│
+                                     └─────────┬─────────┘
+                                               │
+Data Sources → Redis Streams → Strategy Execution → Risk Management → Transaction Signing → Trade Execution
+     ↓              ↓                ↓                    ↓                    ↓                ↓
+data_consumers → executor    →   risk_guardian   →   wallet_guard    →    signer      →  Jupiter/Jito
+     └───────────────→ autonomous_allocator ←───────────────┘
+```
+
+### Core Services
+- **executor**: Strategy orchestration and signal processing.
+- **autonomous_allocator**: ML-driven capital allocation.
+- **risk_guardian**: Portfolio-wide risk controls and circuit breakers.
+- **position_manager**: Individual position monitoring and stop-losses.
+- **wallet_guard**: Transaction security and limits.
+- **signer**: Isolated transaction signing service.
+- **data_consumers**: Real-time market data ingestion.
+- **prometheus/grafana**: Unified observability stack.
+
+## **�️ System Architecture**
+
+The system is now managed by a single, canonical `docker-compose.prod.yml`. All services are built from one of two universal Dockerfiles (`Dockerfile.rust` or `Dockerfile.python`) for consistency and maintainability.
+
+## Configuration
+
+### Environment Variables (.env)
+
+```bash
+# Trading Mode
+PAPER_TRADING_MODE=true  # Set to false for live trading
+
+# API Keys (REQUIRED FOR PRODUCTION)
+HELIUS_API_KEY=YOUR_FREE_KEY_HERE  # ⚠️ Upgrade to premium before live trading
+HELIUS_PREMIUM_ENABLED=false  # Set true when premium key available
+TWITTER_BEARER_TOKEN=  # Required for social signals
+DRIFT_API_KEY=  # Required for perp strategies
+
+# MEV Protection
+JITO_BLOCK_ENGINE_URL=https://mainnet.block-engine.jito.wtf/api/v1
+JITO_TIP_AMOUNT=0.0001
+JITO_AUTH_ENABLED=false  # Set true when jito_auth_key.json is funded
+
+# Risk Parameters
+MAX_PORTFOLIO_DRAWDOWN=0.15
+MAX_POSITION_SIZE_USD=10000
+DAILY_LOSS_LIMIT_USD=5000
+MAX_OPEN_POSITIONS=10
+STOP_LOSS_PERCENTAGE=0.05
+TAKE_PROFIT_PERCENTAGE=0.15
+
+# Redis Performance
+REDIS_MAX_MEMORY=4gb
+STREAM_MAX_LENGTH=100000
+```
+
+### Security Configuration
+
+```bash
+# Set wallet file permissions (MANDATORY)
+chmod 400 my_wallet.json
+chmod 400 jito_auth_key.json
+```
+
+## Data Reliability Caveat
+
+⚠️ **WARNING**: System currently using Helius free tier API which has:
+- Rate limit: 100 requests/second
+- Potential data delays during high volume
+- No SLA guarantees
+
+**For production trading, upgrade to Helius Premium ($499/month) and set `HELIUS_PREMIUM_ENABLED=true`**
+
+## Risk Management
+
+### Circuit Breaker System
+- Portfolio drawdown limits enforced by `risk_guardian`.
+- Per-trade limits enforced by `wallet_guard`.
+- Daily loss limits with automatic trading halt.
+- Emergency kill switch via Redis.
+
+### MEV Protection
+- Jito bundle integration for frontrun protection.
+- Requires funded wallet in `jito_auth_key.json`.
+- Without this, expect 15-30bps loss per trade to MEV.
+
+## Service Health Monitoring
+
+All services are monitored by Prometheus and Grafana.
+- **Grafana Dashboards**: http://localhost:3000
+- **Prometheus Targets**: http://localhost:9090/targets
+- **Health Checks**: Defined in `docker-compose.prod.yml` for all critical services.
+
+## Quick Start
+
+```bash
+# 1. Configure environment
+cp .env.example .env
+# Edit .env with your API keys
+
+# 2. Set wallet permissions
+chmod 400 *.json
+
+# 3. Deploy all services
+./deploy.sh
+
+# 4. Check status
+./deploy.sh status
+
+# 5. Monitor logs for the executor
+./deploy.sh logs executor
+```
+
+## Database Optimization
+
+Run these indexes for optimal performance:
+```sql
+CREATE INDEX idx_trades_status ON trades(status);
+CREATE INDEX idx_trades_timestamp ON trades(timestamp);
+CREATE INDEX idx_trades_strategy ON trades(strategy_id);
+```
+
+## TODO: External Actions Required
+
+1. **Purchase Helius Premium API**: https://helius.xyz ($499/month)
+2. **Fund Jito Tip Wallet**: Transfer 0.1 SOL to wallet in jito_auth_key.json
+3. **Twitter Developer Access**: https://developer.twitter.com/en/portal/dashboard
+4. **Drift Protocol API**: Contact Drift team for API access
+
+## Known Limitations
+
+- Social signals disabled until Twitter API configured.
+- Funding arbitrage limited without Drift API.
+- MEV protection inactive until Jito wallet funded.
+- Throughput limited on Helius free tier.
+
+## Support
+
+For issues or questions, check logs:
+```bash
+./deploy.sh logs [service_name]
+```
+
+## **🔧 Configuration**
+
+### **Environment Setup**
 
 ## **🌐 Production URLs**
 
@@ -31,6 +198,49 @@ open http://localhost
 | **Health Check** | `http://localhost/health` | System status |
 | **API Endpoints** | `http://localhost/api/` | REST API |
 | **Metrics** | `http://localhost/metrics` | Performance data |
+
+## Architecture Overview
+
+MemeSnipe v18 is a production-ready autonomous trading system for Solana memecoins using a microservices architecture:
+
+```
+Data Sources → Redis Streams → Strategy Execution → Risk Management → Transaction Signing → Trade Execution
+     ↓              ↓                ↓                    ↓                    ↓                ↓
+consumers    →   executor    →   risk_guardian   →   wallet_guard    →    signer      →  Jupiter/Jito
+```
+
+### Core Services
+
+#### Data Layer
+- **data_consumers**: Real-time market data ingestion from multiple sources
+  - `helius_rpc_price_consumer`: Solana price feeds (⚠️ Currently using free tier - upgrade required)
+  - `social_consumer`: Twitter/Discord signals (requires API keys)
+  - `onchain_consumer`: New pool detection and whale monitoring
+  - `bridge_consumer`: Cross-chain flow monitoring
+  - `depth_consumer`: Order book analysis
+  - `funding_consumer`: Perp funding rates (requires Drift API)
+
+#### Trading Core
+- **executor**: Strategy orchestration and signal processing
+- **autonomous_allocator**: ML-driven capital allocation (replaced meta_allocator)
+- **strategy_factory**: Dynamic strategy discovery and registration
+
+#### Risk Management Architecture
+- **risk_guardian**: Portfolio-wide risk controls and circuit breakers
+- **position_manager**: Individual position monitoring and stop-losses
+- **wallet_guard**: Transaction security and limits
+
+#### Infrastructure
+- **signer**: Isolated transaction signing service
+- **dashboard**: Web interface for monitoring
+
+### Active Strategies
+1. `momentum_5m`: Short-term price momentum
+2. `liquidity_migration`: Pool migration arbitrage
+3. `korean_time_burst`: Asia timezone liquidity patterns
+4. `mean_revert_1h`: Hourly mean reversion
+5. `bridge_inflow`: Cross-chain arbitrage
+6. `perp_basis_arb`: Perp-spot basis trading
 
 ## **🏗️ System Architecture**
 
@@ -43,6 +253,125 @@ open http://localhost
 │ • Bridge Flows  │    │ • Risk Engine   │    │ • Solana Chain  │
 │ • Social Data   │    │ • Portfolio Mgr │    │ • Drift Perps   │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
+```
+
+## Configuration
+
+### Environment Variables (.env)
+
+```bash
+# Trading Mode
+PAPER_TRADING_MODE=true  # Set to false for live trading
+
+# API Keys (REQUIRED FOR PRODUCTION)
+HELIUS_API_KEY=YOUR_FREE_KEY_HERE  # ⚠️ Upgrade to premium before live trading
+HELIUS_PREMIUM_ENABLED=false  # Set true when premium key available
+TWITTER_BEARER_TOKEN=  # Required for social signals
+DRIFT_API_KEY=  # Required for perp strategies
+
+# MEV Protection
+JITO_BLOCK_ENGINE_URL=https://mainnet.block-engine.jito.wtf/api/v1
+JITO_TIP_AMOUNT=0.0001
+JITO_AUTH_ENABLED=false  # Set true when jito_auth_key.json is funded
+
+# Risk Parameters
+MAX_PORTFOLIO_DRAWDOWN=0.15
+MAX_POSITION_SIZE_USD=10000
+DAILY_LOSS_LIMIT_USD=5000
+MAX_OPEN_POSITIONS=10
+STOP_LOSS_PERCENTAGE=0.05
+TAKE_PROFIT_PERCENTAGE=0.15
+
+# Redis Performance
+REDIS_MAX_MEMORY=4gb
+STREAM_MAX_LENGTH=100000
+```
+
+### Security Configuration
+
+```bash
+# Set wallet file permissions (MANDATORY)
+chmod 400 my_wallet.json
+chmod 400 jito_auth_key.json
+```
+
+## Data Reliability Caveat
+
+⚠️ **WARNING**: System currently using Helius free tier API which has:
+- Rate limit: 100 requests/second
+- Potential data delays during high volume
+- No SLA guarantees
+
+**For production trading, upgrade to Helius Premium ($499/month) and set `HELIUS_PREMIUM_ENABLED=true`**
+
+## Risk Management
+
+### Circuit Breaker System
+- Portfolio drawdown limits enforced by `risk_guardian`
+- Per-strategy position limits
+- Daily loss limits with automatic trading halt
+- Emergency kill switch via Redis
+
+### MEV Protection
+- Jito bundle integration for frontrun protection
+- Requires funded wallet in `jito_auth_key.json`
+- Without this, expect 15-30bps loss per trade to MEV
+
+## Service Health Monitoring
+
+All services publish heartbeats to `events:data_source_heartbeat`:
+- Monitored by `watchdog` service
+- Automated alerts on service degradation
+- Stale data detection and rejection
+
+## Quick Start
+
+```bash
+# 1. Configure environment
+cp .env.example .env
+# Edit .env with your API keys
+
+# 2. Set wallet permissions
+chmod 400 *.json
+
+# 3. Deploy all services
+./deploy.sh deploy
+
+# 4. Check status
+./deploy.sh status
+
+# 5. Monitor logs
+./deploy.sh logs executor
+```
+
+## Database Optimization
+
+Run these indexes for optimal performance:
+```sql
+CREATE INDEX idx_trades_status ON trades(status);
+CREATE INDEX idx_trades_timestamp ON trades(timestamp);
+CREATE INDEX idx_trades_strategy ON trades(strategy_id);
+```
+
+## TODO: External Actions Required
+
+1. **Purchase Helius Premium API**: https://helius.xyz ($499/month)
+2. **Fund Jito Tip Wallet**: Transfer 0.1 SOL to wallet in jito_auth_key.json
+3. **Twitter Developer Access**: https://developer.twitter.com/en/portal/dashboard
+4. **Drift Protocol API**: Contact Drift team for API access
+
+## Known Limitations
+
+- Social signals disabled until Twitter API configured
+- Funding arbitrage limited without Drift API
+- MEV protection inactive until Jito wallet funded
+- Throughput limited on Helius free tier
+
+## Support
+
+For issues or questions, check logs:
+```bash
+./deploy.sh logs [service_name]
 ```
 
 ## **🔧 Configuration**

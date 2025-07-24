@@ -1,0 +1,28 @@
+# Universal Dockerfile for Python services.
+# Build with: docker build . -f Dockerfile.python --build-arg SERVICE_NAME=helius_rpc_price_consumer --build-arg SERVICE_DIR=data_consumers
+
+ARG PYTHON_VERSION=3.11-slim
+
+FROM python:${PYTHON_VERSION}
+
+# Redeclare build args after FROM
+ARG SERVICE_NAME
+ARG SERVICE_DIR
+ARG APP_USER=appuser
+
+# Set service name as environment variable for runtime
+ENV SERVICE_NAME=${SERVICE_NAME}
+
+RUN useradd -ms /bin/bash ${APP_USER}
+WORKDIR /home/${APP_USER}
+
+# Handle both root-level services and services in subdirectories
+COPY ${SERVICE_DIR}/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the specific service file
+COPY ${SERVICE_DIR}/${SERVICE_NAME}.py .
+
+USER ${APP_USER}
+
+CMD ["sh", "-c", "python -u ${SERVICE_NAME}.py"]

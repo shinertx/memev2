@@ -6,7 +6,7 @@ set -e
 
 # Configuration
 PROJECT_NAME="MemeSnipe v18"
-COMPOSE_FILE="docker-compose.working.yml"
+COMPOSE_FILE="docker-compose.prod.yml"
 ENV_FILE=".env"
 BACKUP_DIR="backups"
 

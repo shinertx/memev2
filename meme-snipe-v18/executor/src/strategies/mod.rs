@@ -1,11 +1,12 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use serde_json::Value;
-use shared_models::{EventType, MarketEvent, StrategyAction, Side}; // P-5: Import Side
+use shared_models::{EventType, MarketEvent, Side, StrategyAction}; // P-5: Import Side
 use std::collections::HashSet;
 
 #[async_trait]
-pub trait Strategy: Send + Sync + 'static { // Added 'static bound
+pub trait Strategy: Send + Sync + 'static {
+    // Added 'static bound
     fn id(&self) -> &'static str;
     fn subscriptions(&self) -> HashSet<EventType>;
     async fn init(&mut self, params: &Value) -> Result<()>;
@@ -13,7 +14,10 @@ pub trait Strategy: Send + Sync + 'static { // Added 'static bound
 }
 
 // Strategy constructor for dynamic loading
-pub struct StrategyConstructor(pub &'static str, pub Box<dyn Fn() -> Box<dyn Strategy> + Send + Sync>);
+pub struct StrategyConstructor(
+    pub &'static str,
+    pub Box<dyn Fn() -> Box<dyn Strategy> + Send + Sync>,
+);
 inventory::collect!(StrategyConstructor);
 
 // Macro to simplify registration in each strategy file

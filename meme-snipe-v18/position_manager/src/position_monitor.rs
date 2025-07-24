@@ -3,16 +3,19 @@ use crate::config::CONFIG;
 use crate::database::{Database, TradeRecord};
 use crate::jupiter::JupiterClient;
 use crate::signer_client;
-use anyhow::{anyhow, Result};
-use shared_models::{MarketEvent, EventType, OrderDetails, Side};
+use anyhow::Result;
+use redis::{
+    streams::{StreamReadOptions, StreamReadReply},
+    AsyncCommands,
+};
+use shared_models::{PriceTick, Side};
 use solana_sdk::pubkey::Pubkey;
+use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
-use std::collections::HashMap;
+use std::time::Duration;
 use tokio::sync::Mutex;
 use tracing::{debug, error, info, instrument, warn};
-use redis::AsyncCommands;
-use std::time::Duration;
 
 pub async fn run_monitor(db: Arc<Database>) -> Result<()> {
     info!("📈 Starting Position Manager (Live Position Monitoring)...");
@@ -21,7 +24,7 @@ pub async fn run_monitor(db: Arc<Database>) -> Result<()> {
     let jupiter_client = Arc::new(JupiterClient::new(CONFIG.jupiter_api_url.clone()));
 
     // P-7: Use Redis Streams for market events
-    let mut conn = redis_client.get_async_connection().await?;
+    let mut conn = redis_client.get_multiplexed_async_connection().await?;
     let mut market_stream_ids = HashMap::new();
     market_stream_ids.insert("events:price".to_string(), "0".to_string()); // Subscribe to price updates
 
@@ -29,22 +32,24 @@ pub async fn run_monitor(db: Arc<Database>) -> Result<()> {
     let current_prices: Arc<Mutex<HashMap<String, f64>>> = Arc::new(Mutex::new(HashMap::new()));
 
     loop {
+        let opts = StreamReadOptions::default().count(10).block(5000);
         tokio::select! {
             // Read from market event streams (specifically price updates)
-            result = conn.xread_map(&market_stream_ids, &[("events:price", ">")]).await => {
+            result = conn.xread_options::<_, _, Option<StreamReadReply>>(&["events:price"], &["$"], &opts) => {
                 match result {
                     Ok(streams) => {
-                        for (stream_name, messages) in streams {
-                            for (id, payload) in messages {
-                                if let Some(event_bytes) = payload.get("event") {
-                                    if let Ok(event) = serde_json::from_slice::<shared_models::PriceTick>(event_bytes) {
-                                        current_prices.lock().await.insert(event.token_address.clone(), event.price_usd);
-                                        debug!("Updated price for {}: {:.4}", event.token_address, event.price_usd);
-                                    } else {
-                                        error!("Failed to deserialize PriceTick from stream ID {}: {:?}", String::from_utf8_lossy(&id.id), String::from_utf8_lossy(event_bytes));
+                        if let Some(stream_reply) = streams {
+                            for stream_key in stream_reply.keys {
+                                for message in stream_key.ids {
+                                    if let Some(redis::Value::Data(event_bytes)) = message.map.get("event") {
+                                        if let Ok(event) = serde_json::from_slice::<PriceTick>(&event_bytes) {
+                                            current_prices.lock().await.insert(event.token_address.clone(), event.price_usd);
+                                            debug!("Updated price for {}: {:.4}", event.token_address, event.price_usd);
+                                        } else {
+                                            error!("Failed to deserialize PriceTick from stream ID {}: {:?}", message.id, String::from_utf8_lossy(&event_bytes));
+                                        }
                                     }
                                 }
-                                market_stream_ids.insert(stream_name, String::from_utf8_lossy(&id.id).to_string());
                             }
                         }
                     }
@@ -81,14 +86,21 @@ async fn check_open_positions(
     for mut trade in open_trades {
         if let Some(&current_price_usd) = prices_guard.get(&trade.token_address) {
             // Update highest price seen for trailing stop
-            if trade.highest_price_usd.is_none() || current_price_usd > trade.highest_price_usd.unwrap() {
+            if trade.highest_price_usd.is_none()
+                || current_price_usd > trade.highest_price_usd.unwrap()
+            {
                 trade.highest_price_usd = Some(current_price_usd);
                 db.update_highest_price(trade.id, current_price_usd)?;
-                debug!("Updated HWM for trade {}: {:.4}", trade.id, current_price_usd);
+                debug!(
+                    "Updated HWM for trade {}: {:.4}",
+                    trade.id, current_price_usd
+                );
             }
 
-            let pnl_pct = (current_price_usd - trade.entry_price_usd) / trade.entry_price_usd * 100.0;
-            let tsl_trigger_price = trade.highest_price_usd.unwrap() * (1.0 - CONFIG.trailing_stop_loss_percent / 100.0);
+            let pnl_pct =
+                (current_price_usd - trade.entry_price_usd) / trade.entry_price_usd * 100.0;
+            let tsl_trigger_price = trade.highest_price_usd.unwrap()
+                * (1.0 - CONFIG.trailing_stop_loss_percent / 100.0);
 
             info!(
                 trade_id = trade.id,
@@ -104,17 +116,29 @@ async fn check_open_positions(
 
             // Check Trailing Stop Loss for LONG positions
             if trade.side == Side::Long.to_string() && current_price_usd < tsl_trigger_price {
-                info!(trade_id = trade.id, "🚨 Trailing Stop Loss triggered for LONG position!");
-                execute_close_trade(db.clone(), jupiter_client.clone(), trade, current_price_usd).await?;
+                info!(
+                    trade_id = trade.id,
+                    "🚨 Trailing Stop Loss triggered for LONG position!"
+                );
+                execute_close_trade(db.clone(), jupiter_client.clone(), trade, current_price_usd)
+                    .await?;
             }
             // Check Trailing Stop Loss for SHORT positions (price goes UP against us)
-            else if trade.side == Side::Short.to_string() && current_price_usd > tsl_trigger_price {
-                info!(trade_id = trade.id, "🚨 Trailing Stop Loss triggered for SHORT position!");
-                execute_close_trade(db.clone(), jupiter_client.clone(), trade, current_price_usd).await?;
+            else if trade.side == Side::Short.to_string() && current_price_usd > tsl_trigger_price
+            {
+                info!(
+                    trade_id = trade.id,
+                    "🚨 Trailing Stop Loss triggered for SHORT position!"
+                );
+                execute_close_trade(db.clone(), jupiter_client.clone(), trade, current_price_usd)
+                    .await?;
             }
             // TODO: Add Take Profit logic here if desired
         } else {
-            warn!("Price not available for open trade {}. Skipping monitoring for now.", trade.id);
+            warn!(
+                "Price not available for open trade {}. Skipping monitoring for now.",
+                trade.id
+            );
         }
     }
     Ok(())
@@ -132,25 +156,34 @@ async fn execute_close_trade(
 
     let pnl_usd = if trade.side == Side::Long.to_string() {
         (close_price_usd - trade.entry_price_usd) * (trade.amount_usd / trade.entry_price_usd)
-    } else { // Short position
+    } else {
+        // Short position
         (trade.entry_price_usd - close_price_usd) * (trade.amount_usd / trade.entry_price_usd)
     };
 
     if trade.side == Side::Long.to_string() {
         // Sell spot via Jupiter
-        let swap_tx_b64 = jupiter.get_swap_transaction(&user_pk, &trade.token_address, trade.amount_usd, 50).await?; // Use 50 bps slippage
-        let signed_tx_b64 = signer_client::sign_transaction(&CONFIG.signer_url, &swap_tx_b64).await?;
+        let swap_tx_b64 = jupiter
+            .get_swap_transaction(&user_pk, &trade.token_address, trade.amount_usd, 50)
+            .await?; // Use 50 bps slippage
+        let signed_tx_b64 =
+            signer_client::sign_transaction(&CONFIG.signer_url, &swap_tx_b64).await?;
         let tx = crate::jupiter::deserialize_transaction(&signed_tx_b64)?;
         // TODO: Send via Jito (needs JitoClient instance here)
         info!(signature = %tx.signatures[0], "✅ Spot sell submitted via Jupiter/Signer.");
-    } else { // Short position, close via Drift
+    } else {
+        // Short position, close via Drift
         info!("Closing SHORT position via Drift perps.");
         // This would require a DriftClient instance here and logic to close the position.
         // Example: drift_client.close_position(...).await?;
         info!("P-4: Drift SHORT position close simulated.");
     }
 
-    let status = if pnl_usd > 0.0 { "CLOSED_PROFIT" } else { "CLOSED_LOSS" };
+    let status = if pnl_usd > 0.0 {
+        "CLOSED_PROFIT"
+    } else {
+        "CLOSED_LOSS"
+    };
     db.update_trade_pnl(trade.id, status, close_price_usd, pnl_usd)?;
     info!("Trade closed. Status: {}, PnL: {:.2} USD", status, pnl_usd);
 

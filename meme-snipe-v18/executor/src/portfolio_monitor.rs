@@ -2,9 +2,9 @@
 use crate::config::CONFIG;
 use crate::database::Database;
 use anyhow::Result;
+use redis::AsyncCommands;
 use std::{sync::Arc, time::Duration};
-use tracing::{error, info, warn};
-use redis::AsyncCommands; // P-7: For Redis Streams
+use tracing::{error, info, warn}; // P-7: For Redis Streams
 
 pub async fn run_monitor(db: Arc<Database>, portfolio_paused_flag: Arc<tokio::sync::Mutex<bool>>) {
     info!("📈 Starting Portfolio Monitor (P-6)...");
@@ -26,7 +26,10 @@ pub async fn run_monitor(db: Arc<Database>, portfolio_paused_flag: Arc<tokio::sy
         let mut conn = match client.get_async_connection().await {
             Ok(c) => c,
             Err(e) => {
-                warn!("Portfolio Monitor: Failed to connect to Redis: {}. Retrying in 5s.", e);
+                warn!(
+                    "Portfolio Monitor: Failed to connect to Redis: {}. Retrying in 5s.",
+                    e
+                );
                 tokio::time::sleep(Duration::from_secs(5)).await;
                 continue;
             }
@@ -49,7 +52,8 @@ pub async fn run_monitor(db: Arc<Database>, portfolio_paused_flag: Arc<tokio::sy
                 );
 
                 if drawdown_from_peak > CONFIG.portfolio_stop_loss_percent {
-                    if !*portfolio_paused_flag.lock().await { // P-6: Check internal flag
+                    if !*portfolio_paused_flag.lock().await {
+                        // P-6: Check internal flag
                         error!(
                             "🚨 PORTFOLIO STOP LOSS TRIGGERED! Drawdown {:.2}% > Threshold {:.2}%. Pausing trading.",
                             drawdown_from_peak, CONFIG.portfolio_stop_loss_percent
@@ -60,9 +64,11 @@ pub async fn run_monitor(db: Arc<Database>, portfolio_paused_flag: Arc<tokio::sy
                         }
                         *portfolio_paused_flag.lock().await = true; // P-6: Update internal flag
                     }
-                } else if *portfolio_paused_flag.lock().await { // P-6: Check internal flag
+                } else if *portfolio_paused_flag.lock().await {
+                    // P-6: Check internal flag
                     // If currently paused but drawdown is recovered, resume
-                    if drawdown_from_peak < CONFIG.portfolio_stop_loss_percent * 0.8 { // Resume if recovered significantly
+                    if drawdown_from_peak < CONFIG.portfolio_stop_loss_percent * 0.8 {
+                        // Resume if recovered significantly
                         info!("✅ Portfolio recovered. Drawdown {:.2}% < Threshold {:.2}%. Resuming trading.",
                             drawdown_from_peak, CONFIG.portfolio_stop_loss_percent * 0.8);
                         // P-6: Publish to kill switch channel (Pub/Sub)

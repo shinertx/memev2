@@ -54,13 +54,20 @@ pub struct JupiterClient {
 impl JupiterClient {
     pub fn new() -> Self {
         Self {
-            client: Client::builder().timeout(Duration::from_secs(15)).build().expect("Failed to build HTTP client"),
+            client: Client::builder()
+                .timeout(Duration::from_secs(15))
+                .build()
+                .expect("Failed to build HTTP client"),
         }
     }
 
     // P-1: Corrected Jupiter quote URL pattern
     // P-2: Now takes amount_sol_to_swap directly (calculated from USD in executor)
-    pub async fn get_quote(&self, amount_sol_to_swap: f64, output_mint: &str) -> Result<QuoteResult> {
+    pub async fn get_quote(
+        &self,
+        amount_sol_to_swap: f64,
+        output_mint: &str,
+    ) -> Result<QuoteResult> {
         let amount_lamports = (amount_sol_to_swap * 1_000_000_000.0) as u64; // Convert SOL to Lamports
         let url = format!(
             "{}/quote?inputMint=So11111111111111111111111111111111111111112&outputMint={}&amount={}&slippageBps={}",
@@ -68,20 +75,34 @@ impl JupiterClient {
         );
 
         let response: JupiterQuoteResponse = self.client.get(&url).send().await?.json().await?;
-        let best_route = response.data.first().ok_or_else(|| anyhow!("No route found by Jupiter for {}", output_mint))?;
-        
+        let best_route = response
+            .data
+            .first()
+            .ok_or_else(|| anyhow!("No route found by Jupiter for {}", output_mint))?;
+
         let out_amount: u64 = best_route.out_amount.parse()?;
-        
+
         // Calculate price_per_token based on the swap of the SOL amount provided
         let price_per_token = (amount_sol_to_swap / (out_amount as f64 / 1_000_000_000.0)).recip(); // (SOL_amount / tokens_received) -> SOL_per_Token; then invert for Token_per_SOL, convert to USD later.
-        info!("Jupiter quote for {} SOL -> {}. Price per token: {:.8} USD", amount_sol_to_swap, output_mint, price_per_token);
+        info!(
+            "Jupiter quote for {} SOL -> {}. Price per token: {:.8} USD",
+            amount_sol_to_swap, output_mint, price_per_token
+        );
 
-        Ok(QuoteResult { out_amount, price_per_token })
+        Ok(QuoteResult {
+            out_amount,
+            price_per_token,
+        })
     }
 
     // P-1: Corrected Jupiter swap URL pattern
     // P-2: Now takes amount_usd_to_swap directly (executor handles SOL conversion)
-    pub async fn get_swap_transaction(&self, user_pubkey: &Pubkey, output_mint: &str, amount_usd_to_swap: f64) -> Result<String> {
+    pub async fn get_swap_transaction(
+        &self,
+        user_pubkey: &Pubkey,
+        output_mint: &str,
+        amount_usd_to_swap: f64,
+    ) -> Result<String> {
         // Executor passes amount in USD, this function assumes current SOL price for Jupiter call
         // In a real system, you'd get the live SOL/USD price from the event bus
         let amount_sol_approx = amount_usd_to_swap / 150.0; // Placeholder SOL price for Jupiter's internal calculation.
@@ -91,8 +112,9 @@ impl JupiterClient {
             "{}/quote?inputMint=So11111111111111111111111111111111111111112&outputMint={}&amount={}&slippageBps={}",
             CONFIG.jupiter_api_url, output_mint, amount_lamports, CONFIG.slippage_bps
         );
-        let quote_response: serde_json::Value = self.client.get(&quote_url).send().await?.json().await?;
-        
+        let quote_response: serde_json::Value =
+            self.client.get(&quote_url).send().await?.json().await?;
+
         let swap_payload = serde_json::json!({
             "quoteResponse": quote_response,
             "userPublicKey": user_pubkey.to_string(),
@@ -100,8 +122,18 @@ impl JupiterClient {
         });
 
         let swap_url = format!("{}/swap", CONFIG.jupiter_api_url);
-        let response: SwapResponse = self.client.post(swap_url).json(&swap_payload).send().await?.json().await?;
-        info!("Generated Jupiter swap transaction for {} USD.", amount_usd_to_swap);
+        let response: SwapResponse = self
+            .client
+            .post(swap_url)
+            .json(&swap_payload)
+            .send()
+            .await?
+            .json()
+            .await?;
+        info!(
+            "Generated Jupiter swap transaction for {} USD.",
+            amount_usd_to_swap
+        );
         Ok(response.swap_transaction)
     }
 }

@@ -1,0 +1,53 @@
+# Universal, optimized Dockerfile for all Rust services.
+# Build with: docker build . -f Dockerfile.rust --build-arg SERVICE_NAME=executor
+
+# --- ARGS ---
+ARG SERVICE_NAME
+ARG RUST_VERSION=1.83
+ARG APP_USER=appuser
+
+# --- BUILDER ---
+FROM rust:${RUST_VERSION}-slim as builder
+
+ARG APP_USER=appuser
+ARG SERVICE_NAME
+
+# Use jemalloc for performance
+RUN apt-get update && apt-get install -y libjemalloc-dev build-essential
+
+WORKDIR /app
+
+# Create a non-root user
+RUN useradd -ms /bin/bash ${APP_USER}
+
+# Use cargo-chef for cached dependencies
+RUN cargo install cargo-chef
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json
+
+# Build the specific service
+COPY ${SERVICE_NAME}/src ./src
+COPY ${SERVICE_NAME}/Cargo.toml .
+RUN cargo build --release --bin ${SERVICE_NAME}
+
+# --- FINAL IMAGE ---
+FROM debian:bullseye-slim
+
+ARG APP_USER=appuser
+ARG SERVICE_NAME
+
+RUN apt-get update && apt-get install -y libjemalloc2 && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN useradd -ms /bin/bash ${APP_USER}
+USER ${APP_USER}
+WORKDIR /home/${APP_USER}
+
+# Copy binary from builder
+COPY --from=builder /app/target/release/${SERVICE_NAME} .
+
+# Use jemalloc
+ENV LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2
+
+CMD ["./${SERVICE_NAME}"]

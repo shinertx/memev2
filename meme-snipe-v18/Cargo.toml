@@ -4,6 +4,8 @@ members = [
     "signer",
     "meta_allocator",
     "position_manager",
+    "risk_guardian",
+    "wallet_guard",
     "shared-models"
 ]
 resolver = "2"
@@ -49,9 +51,20 @@ reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
 axum = "0.7"
 url = "2.5"
 
-# Solana
-solana-client = "1.18"
-solana-sdk = "1.18"
+# Force older base64ct to avoid edition2024 requirement  
+base64ct = "1.6"
+
+# Solana dependencies - using 1.18.18 for stability
+solana-client = "1.18.18"
+solana-sdk = "1.18.18" 
+solana-program = "1.18.18"
+
+# Patch to resolve curve25519-dalek and ahash version conflicts
+# ----------  🔒 dependency unification ----------
+[patch.crates-io]
+# Use git source for curve25519-dalek to avoid same-source conflict
+curve25519-dalek = { git = "https://github.com/dalek-cryptography/curve25519-dalek", rev = "8274d5cbb6fc3f38cdc742b4798173895cd2a290" }
+# -------------------------------------------------------
 
 [profile.dev]
 opt-level = 0
