@@ -36,9 +36,6 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 COPY --from=builder --chown=appuser:appuser /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Set up shared directory for database
-RUN mkdir -p /app/shared && chown -R appuser:appuser /app
-
 # Copy application code
 WORKDIR /app
 COPY --chown=appuser:appuser . .
@@ -50,3 +47,7 @@ USER appuser
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONHASHSEED=random
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1

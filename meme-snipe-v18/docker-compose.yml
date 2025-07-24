@@ -97,6 +97,10 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      risk_guardian:
+        condition: service_healthy
+      wallet_guard:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9090/health"]
       interval: 30s
@@ -117,6 +121,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      executor:
+        condition: service_healthy
 
   risk_guardian:
     <<: *rust-common
@@ -131,11 +137,6 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9090/health"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
 
   position_manager:
     <<: *rust-common
@@ -150,6 +151,8 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      executor:
+        condition: service_healthy
 
   wallet_guard:
     <<: *rust-common
@@ -162,11 +165,6 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9090/health"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
 
   signer:
     <<: *rust-common
@@ -185,11 +183,6 @@ services:
     environment:
       - WALLET_PATH=/app/my_wallet.json
       - JITO_AUTH_KEY_PATH=/app/jito_auth_key.json
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
 
   # Python Services
   data_consumers:
@@ -201,6 +194,11 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health').raise_for_status()"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
 
   strategy_factory:
     <<: *python-common
@@ -210,6 +208,8 @@ services:
     command: python factory.py
     depends_on:
       redis:
+        condition: service_healthy
+      executor:
         condition: service_healthy
 
   dashboard:
@@ -299,174 +299,4 @@ volumes:
   prometheus-data:
     driver: local
   grafana-data:
-    driver: local
-      redis:
-        condition: service_healthy
-    ports:
-      - "8005:8005"  # Expose metrics port
-    env_file: .env
-    environment:
-      - PYTHONUNBUFFERED=1
-    networks:
-      - backend
-      - monitoring
-
-  position_manager:
-    build:
-      context: .
-      dockerfile: position_manager/Dockerfile
-      cache_from:
-        - ${DOCKER_REGISTRY:-local}/meme-snipe:position-manager-cache
-    image: ${DOCKER_REGISTRY:-local}/meme-snipe:position-manager
-    restart: unless-stopped
-    logging: *default-logging
-    depends_on:
-      redis:
-        condition: service_healthy
-      executor:
-        condition: service_healthy
-      signer:
-        condition: service_healthy
-    env_file: .env
-    environment:
-      - RUST_LOG=${LOG_LEVEL:-info}
-      - RUST_BACKTRACE=1
-      - DATABASE_PATH=/app/data/trades.db
-    volumes:
-      - type: bind
-        source: ./shared
-        target: /app/data
-    networks:
-      - backend
-
-  dashboard:
-    build:
-      context: .
-      dockerfile: dashboard/Dockerfile
-    image: ${DOCKER_REGISTRY:-local}/meme-snipe:dashboard
-    restart: unless-stopped
-    logging: *default-logging
-    depends_on:
-      redis:
-        condition: service_healthy
-      executor:
-        condition: service_started
-    ports:
-      - "${DASHBOARD_PORT:-8080}:5000"
-    env_file: .env
-    environment:
-      - PYTHONUNBUFFERED=1
-      - DATABASE_PATH=/app/data/trades_v18.db
-      - FLASK_ENV=production
-    volumes:
-      - type: bind
-        source: ./shared
-        target: /app/data
-        read_only: true
-    networks:
-      - backend
-      - frontend
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  prometheus:
-    image: prom/prometheus:latest
-    restart: unless-stopped
-    logging: *default-logging
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./prometheus.rules.yml:/etc/prometheus/prometheus.rules.yml:ro
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=200h'
-      - '--web.enable-lifecycle'
-    networks:
-      - monitoring
-      - backend
-
-  grafana:
-    image: grafana/grafana:latest
-    restart: unless-stopped
-    logging: *default-logging
-    ports:
-      - "3000:3000"
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_USERS_ALLOW_SIGN_UP=false
-    volumes:
-      - grafana_data:/var/lib/grafana
-    networks:
-      - monitoring
-    depends_on:
-      - prometheus
-
-  analysis:
-    build:
-      context: .
-      dockerfile: analysis/Dockerfile
-    image: ${DOCKER_REGISTRY:-local}/meme-snipe:analysis
-    restart: unless-stopped
-    logging: *default-logging
-    depends_on:
-      redis:
-        condition: service_healthy
-    env_file: .env
-    environment:
-      - PYTHONUNBUFFERED=1
-      - DB_PATH=/app/data/trades_v18.db
-    volumes:
-      - type: bind
-        source: ./shared
-        target: /app/data
-      - type: volume
-        source: logs
-        target: /app/logs
-    networks:
-      - backend
-
-  watchdog:
-    build:
-      context: .
-      dockerfile: watchdog/Dockerfile
-    image: ${DOCKER_REGISTRY:-local}/meme-snipe:watchdog
-    restart: unless-stopped
-    logging: *default-logging
-    ports:
-      - "8008:8008" # Prometheus metrics for watchdog
-    depends_on:
-      redis:
-        condition: service_healthy
-    env_file: .env
-    environment:
-      - PYTHONUNBUFFERED=1
-    networks:
-      - backend
-      - monitoring
-
-networks:
-  frontend:
-    driver: bridge
-  backend:
-    driver: bridge
-    internal: false  # CHANGED: Allow external internet access for API calls
-  monitoring:
-    driver: bridge
-
-volumes:
-  redis_data:
-    driver: local
-  prometheus_data:
-    driver: local
-  grafana_data:
-    driver: local
-  logs:
     driver: local

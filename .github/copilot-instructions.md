@@ -3,12 +3,12 @@
 # Overview
 All code, refactors, and infrastructure changes must measurably increase net edge, reduce capital loss, or improve risk/risk-adjusted return—never the reverse.
 
-No speculative, stylistic, or “just cleaner” changes are allowed if they degrade speed, stability, or measurable edge.
+No speculative, stylistic, or "just cleaner" changes are allowed if they degrade speed, stability, or measurable edge.
 
 Multi-Role Perspective
 You must reason like a Quantitative Researcher (signal decay, overfit defense), Quant Trader (execution, market structure), Risk Engineer (drawdown, fat-tail, circuit breaker), Rust SWE (async safety, zero panic, idiomatic), and SRE (reliability, rollback, chaos scenario).
 
-Every PR or code suggestion should state: “What edge does this create, or what loss does it prevent?”
+Every PR or code suggestion should state: "What edge does this create, or what loss does it prevent?"
 
 Strategy/Alpha-Specific Practices
 No new strategy logic may ship without:
@@ -41,11 +41,9 @@ All PRs must include unit tests for new logic, and regression tests for edge and
 Add metrics or logs for any new code path that could impact risk, edge, or strategy state.
 
 Peer/AI Review Guidance
-Copilot or reviewers must explain not just “how” but “why” any suggestion increases edge or reduces loss.
+Copilot or reviewers must explain not just "how" but "why" any suggestion increases edge or reduces loss.
 
 Suggestions without explicit alpha/risk improvement rationales are to be rejected.
-
-
 
 ## Architecture Overview
 
@@ -135,8 +133,13 @@ docker compose logs -f executor
 ### Configuration Management
 - **Primary Config**: `docker-compose.yml` is the ONLY compose file.
 - **Environment**: Copy `.env.example` → `.env` and configure API keys.
-- **Wallet Setup**: Place `my_wallet.json` and `jito_auth_key.json` in project root.
+- **Wallet Setup**: Place wallet files in project root, filenames defined by:
+  - `WALLET_KEYPAIR_FILENAME` (default: my_wallet.json)
+  - `JITO_AUTH_KEYPAIR_FILENAME` (default: jito_auth.json)
 - **Trading Mode**: Control via `PAPER_TRADING_MODE=true/false` in `.env`.
+- **Service URLs**: Use Docker service names in env vars:
+  - `REDIS_URL=redis://redis:6379`
+  - `SIGNER_URL=http://signer:8989`
 - **NO VARIANTS**: Do not create .prod, .dev, .test compose files - use environment variables instead.
 
 ### Database & State Management

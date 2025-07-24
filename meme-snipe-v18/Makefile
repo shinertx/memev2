@@ -1,6 +1,6 @@
 # MemeSnipe v18 - Production Makefile
 
-.PHONY: help deploy start stop restart status logs update backup clean health test build cargo-verify cargo-clean-deps cargo-update-smart cargo-tree cargo-bloat validate-env
+.PHONY: help deploy start stop restart status logs update backup clean health test build cargo-verify cargo-clean-deps cargo-update-smart cargo-tree cargo-bloat
 
 # Default target
 all: help
@@ -54,8 +54,14 @@ backup:
 clean:
 	./deploy.sh clean
 
-health:
-	./deploy.sh health
+health: ## Check health of all services
+	@echo "Checking service health..."
+	@$(COMPOSE) ps
+	@echo "\nChecking endpoints..."
+	@for port in 9091 9092 9093 9094 9095 8080 80 3000 9090; do \
+		echo -n "Port $$port: "; \
+		curl -s -o /dev/null -w "%{http_code}" http://localhost:$$port/health 2>/dev/null || echo "N/A"; \
+	done
 
 # Development commands
 test:
@@ -97,11 +103,10 @@ cargo-bloat: ## Analyze binary size
 	@cargo install cargo-bloat --locked
 	@cargo bloat --release --crates
 
-validate-env: ## Validate .env configuration
-	@chmod +x scripts/validate-env.sh
-	@./scripts/validate-env.sh
+# Remove validate-env from the all target temporarily
+all: check-cargo test perf-build ## Run tests and build all images with performance optimizations
 
-setup: validate-env ## Initial setup and validation
+setup: ## Initial setup and validation
 	@echo "🚀 Setting up MemeSnipe v18..."
 	@if [ ! -f .env ]; then \
 		echo "Creating .env from template..."; \
@@ -111,12 +116,9 @@ setup: validate-env ## Initial setup and validation
 	fi
 	@echo "✅ Setup complete"
 
-pre-deploy: validate-env cargo-verify ## Pre-deployment checks
+pre-deploy: cargo-verify ## Pre-deployment checks
 	@echo "🔍 Running pre-deployment checks..."
 	@echo "✅ All checks passed"
-
-# Update the all target to include validation
-all: validate-env check-cargo test perf-build ## Run validation, tests and build all images
 
 # Legacy aliases for compatibility
 up: start

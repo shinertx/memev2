@@ -141,9 +141,9 @@ def get_real_sol_price() -> float:
 def get_redis_connection():
     """Get Redis connection with error handling"""
     try:
-        redis_host = os.getenv('REDIS_HOST', 'localhost')
-        redis_port = int(os.getenv('REDIS_PORT', 6379))
-        return redis.Redis(host=redis_host, port=redis_port, decode_responses=True)
+        # Use REDIS_URL instead of separate host/port
+        redis_url = os.getenv('REDIS_URL', 'redis://redis:6379')
+        return redis.from_url(redis_url, decode_responses=True)
     except Exception as e:
         print(f"⚠️ Redis connection failed: {e}")
         return None

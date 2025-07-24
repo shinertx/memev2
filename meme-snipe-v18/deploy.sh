@@ -67,6 +67,17 @@ restart() {
     deploy
 }
 
+health() {
+    echo -e "${GREEN}📊 Health Check${NC}"
+    docker compose ps
+    echo ""
+    echo "Checking service endpoints..."
+    for port in 9091 9092 9093 9094 9095 8080 80 3000 9090; do
+        printf "Port %-5s: " "$port"
+        curl -s -o /dev/null -w "%{http_code}\n" http://localhost:$port/health 2>/dev/null || echo "N/A"
+    done
+}
+
 # Main command handler
 case "$1" in
     deploy)
@@ -84,8 +95,11 @@ case "$1" in
     restart)
         restart
         ;;
+    health)
+        health
+        ;;
     *)
-        echo "Usage: $0 {deploy|status|logs|stop|restart}"
+        echo "Usage: $0 {deploy|status|logs|stop|restart|health}"
         echo ""
         echo "Commands:"
         echo "  deploy  - Deploy all services"
@@ -93,6 +107,7 @@ case "$1" in
         echo "  logs    - Show logs (optionally specify service)"
         echo "  stop    - Stop all services"
         echo "  restart - Restart all services"
+        echo "  health  - Check service health"
         exit 1
         ;;
 esac

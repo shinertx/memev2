@@ -59,12 +59,10 @@ class StrategyAllocation:
 
 class AutonomousAllocator:
     def __init__(self):
-        self.redis_client = redis.Redis(
-            host=os.getenv('REDIS_HOST', 'redis'),
-            port=int(os.getenv('REDIS_PORT', 6379)),
-            db=0,
-            decode_responses=True
-        )
+        # Use REDIS_URL instead of separate host/port
+        redis_url = os.getenv('REDIS_URL', 'redis://redis:6379')
+        self.redis_client = redis.from_url(redis_url, decode_responses=True)
+        
         self.paper_mode = os.getenv('PAPER_TRADING_MODE', 'true').lower() == 'true'
         self.strategies: Dict[str, StrategyAllocation] = {}
         self.allocation_interval = 300  # 5 minutes
@@ -378,5 +376,7 @@ class AutonomousAllocator:
                 time.sleep(30)  # Wait before retrying
 
 if __name__ == "__main__":
+    allocator = AutonomousAllocator()
+    allocator.run()
     allocator = AutonomousAllocator()
     allocator.run()
